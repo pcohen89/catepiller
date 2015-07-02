@@ -2,7 +2,7 @@
 
 ## Ideas for data build
 
-### Build data by taking summary statistics if multiple components of the same type match one assembly
+### 1. Build data by taking summary statistics if multiple components of the same type match one assembly
 For example, if an assembly has two nuts, in this data build we would aggregate all of the fields associated with those two nuts (like average their weights, take max of their weights, etc) 
 
 Things still to do:
@@ -14,10 +14,10 @@ Summary statistics planned to use:
 - [ ] Take max and min
 - [ ] Count the number of instances of that comp type matched to the assembly
 
-### Don't merge to the sub-component tables, just count instances of each component on the assembly
+### 2. Don't merge to the sub-component tables, just count instances of each component on the assembly
 In this case, the data will have a feature for each component. The feature will count how many of that component are present on the assembly instance
 
-### Try different outcome variables
+### 3. Try different outcome variables
 
 - [ ] Model with current data structure and include units as a field
 
