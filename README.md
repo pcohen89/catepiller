@@ -14,7 +14,8 @@ Summary statistics planned to use:
 - [ ] Take max and min
 - [ ] Count the number of instances of that comp type matched to the assembly
 
-### Don't merge to the sub-component tables, just create a field for every component and count instances on the assembly
+### Don't merge to the sub-component tables, just count instances of each component on the assembly
+In this case, the data will have a feature for each component. The feature will count how many of that component are present on the assembly instance
 
 ### Try different outcome variables
 
