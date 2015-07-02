@@ -13,3 +13,11 @@ Summary statistics planned to use:
 - [ ] Average numeric columns and binary
 - [ ] Take max and min
 - [ ] Count the number of instances of that comp type matched to the assembly
+
+### Don't merge to the sub-component tables, just create a field for every component and count instances on the assembly
+
+### Try different outcome variables
+
+- [ ] Model with current data structure and include units as a field
+
+
