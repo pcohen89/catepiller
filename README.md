@@ -15,7 +15,7 @@ Summary statistics planned to use:
 - [ ] Count the number of instances of that comp type matched to the assembly
 
 ### 2. Don't merge to the sub-component tables, just count instances of each component on the assembly
-In this case, the data will have a feature for each component. The feature will count how many of that component are present on the assembly instance
+In this case, the data will have a feature for each component. The feature will count how many of that component are present on the assembly instance. Note, sometimes you have multiples of the exact same component noted in var component_quantity, so this approach will allow us to incorporate that information in a way that 1. misses
 
 ### 3. Try different outcome variables
 
