@@ -9,7 +9,7 @@ Things still to do:
 - [ ] Encode categorical variables
 - [ ] Create field dictionary for component subtables
 
-Summary Statistics
+Summary statistics planned to use:
 - [ ] Average numeric columns and binary
 - [ ] Take max and min
 - [ ] Count the number of instances of that comp type matched to the assembly
