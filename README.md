@@ -21,6 +21,9 @@ In this case, the data will have a feature for each component. The feature will 
 
 - [ ] Model with current data structure and include units as a field
 
+### 4. Misc data ideas
+- [ ] Sum weight from all components
+
 ## Modeling approaches
 
 ## Blending approaches
