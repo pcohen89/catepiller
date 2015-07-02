@@ -1,6 +1,6 @@
 # Caterpiller
 
-## Ideas for data build
+## Different ideas for how to handle the data
 
 ### 1. Build data by taking summary statistics if multiple components of the same type match one assembly
 For example, if an assembly has two nuts, in this data build we would aggregate all of the fields associated with those two nuts (like average their weights, take max of their weights, etc) 
@@ -20,5 +20,9 @@ In this case, the data will have a feature for each component. The feature will 
 ### 3. Try different outcome variables
 
 - [ ] Model with current data structure and include units as a field
+
+## Modeling approaches
+
+## Blending approaches
 
 
