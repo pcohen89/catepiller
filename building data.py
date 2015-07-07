@@ -1,18 +1,8 @@
 __author__ = 'p_cohen'
 
 import pandas as pd
-import collections
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.linear_model.ridge import RidgeCV
-from sklearn.linear_model import RandomizedLasso
-from sklearn import svm
 import numpy as np
-import time
-from sklearn.feature_selection import SelectKBest, f_regression
-import sklearn as skl
-from sklearn.feature_extraction import DictVectorizer
-import gc
+from sklearn import ensemble, preprocessing
 
 ############### Define Functions ########################
 def create_val_and_train(train, seed, ids, split_rt = .20):
@@ -41,10 +31,6 @@ def rename_nonId(x, merge_id, nm):
     if x == merge_id:
         return x
     return nm + '_' + x
-
-
-for comp_type in comp_types:
-    dfs_to_merge['comp_'+comp_type] = 'component_id'
 
 def merge_on_assembly(df):
     """
@@ -95,61 +81,136 @@ def clean_component_data(comp_dict):
     for name, feat_dict in comp_dict.iteritems():
         df = pd.read_csv(DATA_PATH + 'comp_' + name + '.csv')
         for i in range(0, len(feat_dict)):
-            if feat_dict[i]=='num':
-                mean = df.ix[:,i].mean()
-                df.ix[:,i] = df.ix[:,i].fillna(value=mean)
-        return df
+            # Cleaning steps for categorical or binary variables
+            if ((feat_dict[i]=='cat') | (feat_dict[i]=='bin')):
+                lbl = preprocessing.LabelEncoder()
+                lbl.fit(list(df.ix[:,i]))
+                df.ix[:,i] = lbl.transform(df.ix[:,i])
+        # Spot fix nut (numeric column with string values
+        if name == 'nut':
+            df.ix[df.thread_size == 'M12', 'thread_size'] = -1
+            df.ix[df.thread_size == 'M10', 'thread_size'] = -2
+            df.ix[df.thread_size == 'M8', 'thread_size'] = -3
+            df.ix[df.thread_size == 'M6', 'thread_size'] = -4
+        if name == 'threaded':
+            df.ix[df.nominal_size_1 == 'See Drawing', 'nominal_size_1'] = -1
+            df['nominal_size_4'] = -4
+        df.to_csv(CLN_PATH + 'comp_' + name + '.csv', index=False)
 
-clean_component_data(comp_dict)
+def aggregate_compslots(df, comp, comp_var_list):
+    """
+    If a given component type has multiple instances in one asssembly (i.e an
+    assembly has three nuts on it) then this function creates summary statistics
+    that aggregate field values for each instance of that component type
+    """
+    # Count how many times this assembly matches this comp type
+    comp_ids = []
+    for comp_slot in range(1, 9):
+        comp_ids.append(comp + str(comp_slot) + '_component_id')
+    df[comp+"_count"] = df[comp_ids].count(axis=1)
+    # Create list of all component type columns
+    cols = pd.read_csv(CLN_PATH + 'comp_' + comp + '.csv').columns.values
+    # Loop through list of columns
+    for i in range(0, len(cols)):
+        var = cols[i]
+        # Create list of variables to aggregate
+        var_list = []
+        for comp_slot in range(1, 9):
+            var_list.append(comp + str(comp_slot) + '_' + var)
+        # Save the root of the naming convention for aggregated variables
+        base_nm = comp + '_' + var
+        # use dictionary to check if column is numeric
+        if ((comp_var_list[i] == 'num') or (comp_var_list[i] == 'bin')):
+            # Aggregate list
+            df[base_nm+"_median"] = df[var_list].mean(axis=1)
+        if comp_var_list[i] != 'id':
+            # Store max and min values of variable across types
+            df[base_nm+"_max"] = df[var_list].max(axis=1)
+            df[base_nm+"_min"] = df[var_list].min(axis=1)
+        # drop unaggregated variables
+        df = df.drop(var_list, axis=1)
+    return df
 
-
-def add_component_vars(df, comp):
+def add_component_vars(df, comp, comp_var_list):
     """
     This merges a comp_* table onto bill_of_materials and takes aggregated
     statistics of each field
     """
     merge_var = "component_id"
-
-    # Counter for number of times merge matches
-
+    # Try merging component data against each component 'slot'
     for slot in range(1, 9):
         # Read in csv
-        merge_df = pd.read_csv(DATA_PATH + 'comp_' + comp + '.csv')
+        merge_df = pd.read_csv(CLN_PATH + 'comp_' + comp + '.csv')
         # Rename columns to format tablename_column_name
         merge_df.rename(columns=lambda c: comp + str(slot) + '_' + c,
                         inplace=True)
         # Merge
         left_merge_var = 'bill_of_materials_' + merge_var + '_' + str(slot)
         right_merge_var = comp + str(slot) + '_' + merge_var
-        df = pd.merge(df, merge_df, how='left',
-                      left_on=left_merge_var,
+        df = pd.merge(df, merge_df, how='left', left_on=left_merge_var,
                       right_on=right_merge_var)
-    for var in ['length', 'thread_size', 'weight', 'diameter', 'seat_angle', 'hex_nut_size', 'thread_pitch']:
-        var_list = []
-        for i in range(1, 9):
-            var_list.append(comp + str(i) + '_' + var)
-        df[comp+'_'+var] = df[var_list].mean(axis=1)
-        df = df.drop(var_list, axis=1)
+
+    df = aggregate_compslots(df, comp, comp_var_list)
     return df
 
-add_component_vars(non_test, 'nut')
+def reduce_num_levels(df, col, min_obs):
+    """ Reduces the number of levels in a given variable """
+    # Group by the variable of interest
+    grouped = df.groupby(col)
+    # Take counts of the different levels in that variable
+    df_counts = grouped['tube_assembly_id'].count().reset_index()
+    # Merge counts onto original data
+    df = df.merge(df_counts, on=col)
+    # Set all levels with few counts to Other
+    df[col][df[0]<min_obs] = -1
+    return df[col]
 
-def merge_all_components(df):
+def clean_merged_df(df):
     """
-    This merges all possible component types onto all component "slots" in
-    bill_of_materials
-    :param df:
-    :return:
+    Once normalized tables have been merged, this function will clean for
+    variable construction and then modeling
     """
-    for i in range(1, 9):
-        df = merge_on_component(df, i, comp_types)
+    # Remove all ids other than tube_assembly_id
+    cols = list(df.columns.values)
+    # Separate date variable
+    df['year'] = df.quote_date.apply(lambda x: x[0:4])
+    df['month'] = df.quote_date.apply(lambda x: x[5:7])
+    df['dayofyear'] = df.quote_date.apply(lambda x: x[8:10])
+    df.drop('quote_date', axis=1)
+    # Create list of categorical and numeric vars
+    num_cols = df._get_numeric_data().columns.values
+    for col in num_cols:
+        mean = df[col].mean()
+        df[col] = df[col].fillna(value=mean)
+    # Encode categorical as numeric levels
+    cat_cols = list(set(cols)-set(num_cols)-set(['tube_assembly_id',]))
+    for col in cat_cols:
+        df[col] = df[col].fillna(value="-1")
+        lbl = preprocessing.LabelEncoder()
+        lbl.fit(list(df[col]))
+        df[col] = lbl.transform(df.ix[:,col])
     return df
 
-######################################################
-tube = pd.read_csv(DATA_PATH + 'tube.csv')
-tube = tube.rename(columns=lambda x: 'tube_'+x)
-for x in range(1, len(tube.columns.values)):
-    tube.columns[x] = 'tube_' + tube.columns.values[x]
+def build_vars(df):
+    """ This builds some miscellaneous variables for modeling """
+    all_cols = df.columns.values
+    weight_cols = []
+    quant_col = []
+    for col in all_cols:
+        if 'weight_median' in col:
+            weight_cols.append(col)
+        if 'materials_quantity' in col:
+            quant_col.append(col)
+    df['comp_weight_sum'] = df[weight_cols].sum(axis=1)
+    df['comp_tot_cnt'] = df[quant_col].sum(axis=1)
+    # Reduce number of levels in categorical vars
+    #for col in all_cols:
+    #    num_levels = len(df[col].drop_duplicates())
+    #    # Treat variables with fewer than 500 levels as categorical
+    #    if num_levels < 150:
+    #        # Recode levels with fewer than 300 obs as -1
+    #        df[col] = reduce_num_levels(df, col, 50)
+    return df
 
 ############### Define Globals ########################
 DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'
@@ -157,25 +218,66 @@ CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
 
 ######################################################
 # Data dictionary for cleaning comp tables
+# Data dictionary for cleaning comp tables
 comp_dict = {
-    'boss': ['id', 'id', 'cat', 'cat', 'cat', 'cat', 'num', 'num', 'num', 'bin', 'num', 'num', 'bin', 'bin', 'num']
+    'boss': [
+        'id', 'cat', 'cat', 'cat', 'cat', 'cat', 'num', 'num',
+        'num', 'bin', 'num', 'num', 'bin', 'bin', 'num'
+    ],
+    'adaptor': [
+        'id', 'cat', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'cat',
+        'cat', 'num', 'num', 'num', 'num', 'num', 'bin', 'bin', 'num'
+    ],
+    'elbow': [
+        'id', 'cat', 'num', 'num', 'num', 'num', 'num', 'num', 'num',
+        'cat', 'cat', 'num', 'bin', 'bin', 'bin', 'num'
+    ],
+    'float': [
+        'id', 'cat', 'num', 'num', 'num', 'bin', 'num'
+    ],
+    'hfl': [
+        'id', 'cat', 'num', 'cat', 'cat', 'cat', 'bin', 'bin', 'num'
+    ],
+    'nut': [
+        'id', 'cat', 'num', 'num', 'num', 'num', 'num', 'num',
+        'bin', 'bin', 'num'
+    ],
+    'other': [
+        'id', 'cat', 'num'
+    ],
+    'sleeve': [
+        'id', 'cat', 'cat', 'num', 'num', 'num', 'bin', 'bin', 'bin', 'num'
+    ],
+    'straight': [
+        'id', 'cat', 'num', 'num', 'num', 'num', 'num', 'cat', 'bin', 'bin',
+        'bin', 'num'
+    ],
+    'threaded': [
+        'id', 'cat', 'num', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num',
+        'cat', 'cat', 'num', 'num', 'num', 'num', 'cat', 'cat', 'num', 'num',
+        'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'bin', 'bin',
+        'num'
+    ]
 }
 
 
 # Load train and test data
 non_test = pd.read_csv(DATA_PATH + 'train_set.csv')
+non_test['is_test'] = 0
 test = pd.read_csv(DATA_PATH + 'test_set.csv')
-comp_types = ['adaptor', 'boss', 'elbow', 'float', 'hfl', 'nut', 'other',
-              'sleeve', 'straight', 'tee', 'threaded']
-comp_types = ['adaptor',]
+test['is_test'] = 1
+# Append test and train data
+all_data = non_test.append(test)
+
+# Clean component data
+clean_component_data(comp_dict)
+
 # Merge on needed data sets
-non_test = merge_on_assembly(non_test)
-non_test = merge_on_tube_end(non_test)
-non_test = add_component_vars(non_test, 'nut')
+all_data_wassembly = merge_on_assembly(all_data)
+all_data_wtubeend = merge_on_tube_end(all_data_wassembly)
+for name, field_dict in comp_dict.iteritems():
+    all_data_wtubeend = add_component_vars(all_data_wtubeend, name, field_dict)
+cleaned_all_data = clean_merged_df(all_data_wtubeend)
+all_data_complete = build_vars(cleaned_all_data)
+all_data_complete.to_csv(CLN_PATH + "full_data.csv", index=False)
 
-# Split non_test into train and validation samples
-trn, val = create_val_and_train(non_test, 42, 'tube_assembly_id')
-
-trn
-val
-non_test
