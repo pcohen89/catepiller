@@ -64,6 +64,23 @@ def rmsle(actual, predicted):
     msle_val = np.mean(sle_val)
     return np.sqrt(msle_val)
 
+def lasso_var_select(df, feats):
+    """
+    Uses the lasso to select from a list of features
+    :param df: Dataframe to select features using (must have 'target')
+    :param feats: list of features from which to select
+    :return: Selected list of features
+
+    """
+    lass = Lasso(alpha = .0005)
+    lass.fit(df[feats], df['target'])
+    # Keep only lassoed vars (assigned non zero coefficient)
+    lassoed_vars = []
+    for i in range(0, len(lass.coef_)):
+        if lass.coef_[i] != 0:
+            lassoed_vars.append(feats[i])
+    return lassoed_vars
+
 ######################################################
 
 ### Load data ####
@@ -73,31 +90,7 @@ test = all_data[all_data.is_test != 0]
 
 ### Create list of features
 feats = list(all_data.columns.values)
-non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost',
-             'boss_orientation_median', 'boss_orientation_max',
-             'boss_orientation_min', 'boss_groove_median', 'boss_groove_min',
-             'boss_groove_max', 'float_orientation_median', 'float_orientation_max',
-             'float_orientation_min', 'float_bolt_pattern_long_max', 'float_bolt_pattern_wide_max',
-             'float_bolt_pattern_wide_min', 'nut_orientation_median', 'nut_orientation_min',
-             'nut_orientation_max', 'nut_blind_hole_median',
-             'nut_blind_hole_min', 'nut_blind_hole_max',
-             'adaptor_nominal_size_2_median', 'adaptor_nominal_size_2_max',
-             'adaptor_nominal_size_2_min', 'adaptor_length_2_median', 'adaptor_length_2_max',
-             'adaptor_length_2_min', 'adaptor_length_1_median', 'adaptor_length_1_max',
-             'adaptor_length_1_min', 'adaptor_adaptor_angle_median',
-             'adaptor_adaptor_angle_max', 'adaptor_adaptor_angle_min',
-             'threaded_length_4_median', 'threaded_length_4_min',
-             'threaded_length_4_max', 'threaded_thread_size_4_median',
-             'threaded_thread_size_4_max', 'threaded_thread_size_4_min',
-             'threaded_thread_pitch_4_median', 'threaded_thread_pitch_4_min',
-             'threaded_thread_pitch_4_max', 'threaded_nominal_size_4_max',
-             'threaded_nominal_size_4_min', 'threaded_nominal_size_4_median',
-             'threaded_adaptor_angle_median', 'threaded_adaptor_angle_min',
-             'threaded_adaptor_angle_max', 'sleeve_plating_max',
-             'sleeve_plating_min', 'sleeve_plating_median',
-             'sleeve_orientation_median', 'sleeve_orientation_min',
-             'sleeve_orientation_max', 'hfl_orientation_median',
-             'hfl_orientation_max', 'hfl_orientation_min']
+non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
 for var in non_feats:
     feats.remove(var)
 
@@ -105,23 +98,19 @@ for var in non_feats:
 avg_score = 0
 num_loops = 6
 test['cost'] = 0
-for i in range(0, num_loops):
+for cv_fold in range(0, num_loops):
     # Create trn val samples
-    trn, val = create_val_and_train(non_test, i, 'tube_assembly_id', .2)
+    trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
     # recode target variable
     trn['target'] = trn.cost.apply(lambda x: math.log(x+1))
-    X = trn[feats]
-    val_feats = val[feats]
     # Use lasso to select variables
-    lass = Lasso(alpha = .001)
-    lass.fit(X, trn['target'])
-    lasso_vars = [x != 0 for x in lass.coef_]
+    lassoed_vars = lasso_var_select(trn, feats)
     # fit random forest
-    frst = RandomForestRegressor(n_estimators=1000, n_jobs=8)
-    frst.fit(X.ix[:, lasso_vars], trn['target'])
+    frst = RandomForestRegressor(n_estimators=50, n_jobs=8)
+    frst.fit(trn[lassoed_vars], trn['target'])
     # Predict and rescale predictions
-    val['preds'] = frst.predict(val_feats.ix[:, lasso_vars])
-    val['preds'] = val['preds'].apply(lambda x: math.exp(x)-1)
+    val['raw_preds'] = frst.predict(val[lassoed_vars])
+    val['preds'] = val['raw_preds'].apply(lambda x: math.exp(x)-1)
     score = rmsle(val['cost'], val['preds'])
     # for i in range(0, len(frst.feature_importances_)):
     #     print "Feature %s has importance: %s" % (feats[i],
@@ -129,12 +118,10 @@ for i in range(0, num_loops):
     print "Score is: %s" % score
     avg_score += score/num_loops
     # Predict onto test
-    test_for_pred = test[feats]
-    nm = 'preds'+str(i)
-    test[nm] = frst.predict(test_for_pred.ix[:, lasso_vars])
+    nm = 'preds'+str(cv_fold)
+    test[nm] = frst.predict(test[lassoed_vars])
     test[nm] = test[nm].apply(lambda x: math.exp(x)-1)
     test['cost'] += test[nm]/num_loops
-
 avg_score
 
 # Export test preds
