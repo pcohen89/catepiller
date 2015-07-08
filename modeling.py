@@ -94,9 +94,22 @@ non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
 for var in non_feats:
     feats.remove(var)
 
+def write_preds(df, mod, cv_fold, feats, is_test=1):
+    """
+    This writes predictions froma  model into the test data
+    :param df: test observations
+    :return:
+    """
+    nm = 'preds'+str(cv_fold)
+    df[nm] = mod.predict(df[feats])
+    df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    if is_test == 1:
+        df['cost'] += df[nm]/num_loops
+    return df
+
 ### Run models
 avg_score = 0
-num_loops = 6
+num_loops = 2
 test['cost'] = 0
 for cv_fold in range(0, num_loops):
     # Create trn val samples
@@ -109,19 +122,15 @@ for cv_fold in range(0, num_loops):
     frst = RandomForestRegressor(n_estimators=50, n_jobs=8)
     frst.fit(trn[lassoed_vars], trn['target'])
     # Predict and rescale predictions
-    val['raw_preds'] = frst.predict(val[lassoed_vars])
-    val['preds'] = val['raw_preds'].apply(lambda x: math.exp(x)-1)
-    score = rmsle(val['cost'], val['preds'])
-    # for i in range(0, len(frst.feature_importances_)):
-    #     print "Feature %s has importance: %s" % (feats[i],
-    #                                              frst.feature_importances_[i])
+    val = write_preds(val, frst, cv_fold, lassoed_vars, is_test=0)
+    score = rmsle(val['cost'], val['preds'+str(cv_fold)])
+    #for i in range(0, len(frst.feature_importances_)):
+    #    print "Feature %s has importance: %s" % (feats[i],
+    #                                             frst.feature_importances_[i])
     print "Score is: %s" % score
     avg_score += score/num_loops
     # Predict onto test
-    nm = 'preds'+str(cv_fold)
-    test[nm] = frst.predict(test[lassoed_vars])
-    test[nm] = test[nm].apply(lambda x: math.exp(x)-1)
-    test['cost'] += test[nm]/num_loops
+    #test = write_preds(test, frst, cv_fold, lassoed_vars)
 avg_score
 
 # Export test preds

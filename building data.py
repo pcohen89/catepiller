@@ -32,46 +32,23 @@ def rename_nonId(x, merge_id, nm):
         return x
     return nm + '_' + x
 
-def merge_on_assembly(df):
+def merge_noncomp(df, nm, left_merge, right_merge):
     """
-    This function will merge all of the data sets related to the Kaggle
-    competition for Caterpillar which can be merged simply using the
-    tube_assembly_id
-
+    Merges the non component data sets onto the main training df
+    :param df: Main data set we are merging variables onto
+    :param nm: name of csv to merge on
+    :param left_merge: left merge variable
+    :param right_merge: right merge variable
+    :return: df
     """
-    # Create list of csvs to merge
-    csvs_to_merge = ['tube', 'bill_of_materials', 'specs']
-    # Name merge var
-    merge_var = 'tube_assembly_id'
-    # Loop over csvs to merge
-    for nm in csvs_to_merge:
-        # Read in csv
-        merge_df = pd.read_csv(DATA_PATH + nm +'.csv')
-        # Rename columns to format tablename_column_name
-        merge_df.rename(columns=lambda x: rename_nonId(x, merge_var, nm),
-                        inplace=True)
-        # Merge
-        df = pd.merge(df, merge_df, on=merge_var, how='left')
-    return df
-
-def merge_on_tube_end(df):
-    """
-    This function handles merges related to tube ends, merges onto main data
-    set twice, once for each side (side a and side x)
-    """
-    # Create list of csvs to merge
-    nm = "tube_end_form"
-    # Name merge var
-    merge_var = "end_form_id"
-    # Merge to data about both ends of pipe
-    for end in ['_a', '_x']:
-        # Read in csv
-        merge_df = pd.read_csv(DATA_PATH + nm +'.csv')
-        # Rename columns to format tablename_column_name
-        merge_df.rename(columns=lambda c: nm + end + '_' + c, inplace=True)
-        # Merge
-        df = pd.merge(df, merge_df, how='left', left_on='tube_end'+end,
-                      right_on=nm + end + '_' + merge_var)
+    # Read in csv
+    merge_df = pd.read_csv(DATA_PATH + nm +'.csv')
+    # Rename columns to format tablename_column_name
+    merge_df.rename(columns=lambda x: rename_nonId(x, right_merge, nm),
+                    inplace=True)
+    # Merge
+    df = pd.merge(df, merge_df, left_on=left_merge,
+                  right_on=right_merge, how='left')
     return df
 
 def clean_component_data(comp_dict):
@@ -273,6 +250,13 @@ all_data = non_test.append(test)
 clean_component_data(comp_dict)
 
 # Merge on needed data sets
+tube_merge_csvs = ['tube', 'bill_of_materials', 'specs']
+for csv in tube_merge_csvs:
+    all_data = merge_noncomp(all_data, csv, 'tube_assembly_id',
+                             'tube_assembly_id')
+for tube_end in ['a', 'x']:
+    all_data = merge_noncomp(all_data, "tube_end_form",
+                             "tube_end_" + tube_end, "end_form_id")
 all_data_wassembly = merge_on_assembly(all_data)
 all_data_wtubeend = merge_on_tube_end(all_data_wassembly)
 for name, field_dict in comp_dict.iteritems():
