@@ -26,11 +26,12 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Sum weight from all components
 
 ## Modeling approaches
-- [ ] Gradient deep trees (currently setting up a CV environment to tune one of these up)
-- [ ] Gradient with stumps
+- [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
+- [x] Gradient with stumps
 - [ ] Svm (small data means this might work okay)
 - [ ] penalized regression
 - [ ] NN (sigh)
+- [ ] Try to get XGBOOST running
 
 ## Blending approaches
 My current plan is to blend at the submission level. SO, I will try to create many submissions that are as good as possible using methods that are as different as possible and then do some sort of semi-naive blending of the final submissions. 
