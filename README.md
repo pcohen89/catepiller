@@ -8,7 +8,8 @@ For example, if an assembly has two nuts, in this data build we would aggregate 
 Things still to do:
 - [x] Encode categorical variables
 - [x] Create field dictionary for component subtables
-- [ ] Extract information from the names in type_connection, then merge on to adaptor
+- [x] Extract information from the names in type_connection, then merge on to adaptor
+- [ ] Manual variable creation
 
 Summary statistics planned to use:
 - [x] Average numeric columns and binary
@@ -21,6 +22,7 @@ In this case, the data will have a feature for each component. The feature will 
 ### 3. Try different outcome variables
 
 - [x] Model with current data structure and include units as a field
+- [ ] Somehow account for the fact that some tube assmblies have 4-7 observations associated with them
 
 ### 4. Misc data ideas
 - [x] Sum weight from all components
@@ -31,7 +33,8 @@ In this case, the data will have a feature for each component. The feature will 
 - [ ] Svm (small data means this might work okay)
 - [ ] penalized regression
 - [ ] NN (sigh)
-- [ ] Try to get XGBOOST running
+- [x] Try to get XGBOOST running
+- [ ] Two stage stacking approach (first stage you create predictions for bunch of model using only two components at a time, second state you fite a ridge to all varaibles plus first stage predictions)
 
 ## Blending approaches
 My current plan is to blend at the submission level. SO, I will try to create many submissions that are as good as possible using methods that are as different as possible and then do some sort of semi-naive blending of the final submissions. 
