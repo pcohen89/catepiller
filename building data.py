@@ -5,28 +5,6 @@ import numpy as np
 from sklearn import ensemble, preprocessing
 
 ############### Define Functions ########################
-def create_val_and_train(train, seed, ids, split_rt = .20):
-    """
-        this will create a validate and train
-
-        ids: this is the level of randomization, so if you want to
-        randomize countries, rather than cities, you would
-        set this to 'countries'
-
-        split_rate: pct of data to assign as validation
-    """
-    np.random.seed(seed)
-    # Get vector of de-dupped values of ids
-    id_dat = pd.DataFrame(train[ids].drop_duplicates())
-    # creating random vector to split train val on
-    vect_len = len(id_dat.ix[:, 0])
-    id_dat['rand_vals'] = (np.array(np.random.rand(vect_len,1)))
-    train = pd.merge(train, id_dat, on=ids)
-    # splits train into modeling and validating portions
-    trn_for_mods = train[train["rand_vals"] > split_rt]
-    trn_for_val = train[train["rand_vals"] <= split_rt]
-    return trn_for_mods, trn_for_val
-
 def rename_nonId(x, merge_id, nm):
     if x == merge_id:
         return x
@@ -57,6 +35,15 @@ def clean_component_data(comp_dict):
     """
     for name, feat_dict in comp_dict.iteritems():
         df = pd.read_csv(DATA_PATH + 'comp_' + name + '.csv')
+        if name == 'adaptor':
+            df_type = pd.read_csv(CLN_PATH + 'type_connection.csv')
+            id_root = 'connection_type_id'
+            df = df.merge(df_type, left_on=id_root + '_1', right_on=id_root)
+            df = df.merge(df_type, left_on=id_root + '_2', right_on=id_root)
+            drop_vars = ['connection_type_id_x', 'connection_type_id_y',
+                         'name_x', 'name_y']
+            for var in drop_vars:
+                df = df.drop(var, axis=1)
         for i in range(0, len(feat_dict)):
             # Cleaning steps for categorical or binary variables
             if ((feat_dict[i]=='cat') | (feat_dict[i]=='bin')):
@@ -65,14 +52,21 @@ def clean_component_data(comp_dict):
                 df.ix[:,i] = lbl.transform(df.ix[:,i])
         # Spot fix nut (numeric column with string values
         if name == 'nut':
-            df.ix[df.thread_size == 'M12', 'thread_size'] = -1
-            df.ix[df.thread_size == 'M10', 'thread_size'] = -2
-            df.ix[df.thread_size == 'M8', 'thread_size'] = -3
-            df.ix[df.thread_size == 'M6', 'thread_size'] = -4
+            # Encode as missing number
+            for str_ in ['M12', 'M10', 'M8', 'M6']:
+                df.ix[df.thread_size == str_, 'thread_size'] = -1*int(str_[1:])
         if name == 'threaded':
             df.ix[df.nominal_size_1 == 'See Drawing', 'nominal_size_1'] = -1
             df['nominal_size_4'] = -4
         df.to_csv(CLN_PATH + 'comp_' + name + '.csv', index=False)
+
+def clean_type_connection(path, outpath):
+    df_connect = pd.read_csv(path+'type_connection.csv')
+    df_connect['has_flare'] = df_connect['name'].apply(lambda x: 'Flare' in x)
+    df_connect['has_flange'] = df_connect['name'].apply(lambda x: 'Flange' in x)
+    df_connect['has_metric'] = df_connect['name'].apply(lambda x: 'Metric' in x)
+    df_connect['has_sae'] = df_connect['name'].apply(lambda x: 'SAE' in x)
+    df_connect.to_csv(outpath + 'type_connection.csv', index=False)
 
 def aggregate_compslots(df, comp, comp_var_list):
     """
@@ -126,21 +120,8 @@ def add_component_vars(df, comp, comp_var_list):
         right_merge_var = comp + str(slot) + '_' + merge_var
         df = pd.merge(df, merge_df, how='left', left_on=left_merge_var,
                       right_on=right_merge_var)
-
     df = aggregate_compslots(df, comp, comp_var_list)
     return df
-
-def reduce_num_levels(df, col, min_obs):
-    """ Reduces the number of levels in a given variable """
-    # Group by the variable of interest
-    grouped = df.groupby(col)
-    # Take counts of the different levels in that variable
-    df_counts = grouped['tube_assembly_id'].count().reset_index()
-    # Merge counts onto original data
-    df = df.merge(df_counts, on=col)
-    # Set all levels with few counts to Other
-    df[col][df[0]<min_obs] = -1
-    return df[col]
 
 def clean_merged_df(df):
     """
@@ -159,8 +140,9 @@ def clean_merged_df(df):
     for col in num_cols:
         mean = df[col].mean()
         df[col] = df[col].fillna(value=mean)
-    # Encode categorical as numeric levels
+    # Treat non numeric cols as categoricals
     cat_cols = list(set(cols)-set(num_cols)-set(['tube_assembly_id',]))
+    # Encode categoricals as numerics
     for col in cat_cols:
         df[col] = df[col].fillna(value="-1")
         lbl = preprocessing.LabelEncoder()
@@ -168,33 +150,31 @@ def clean_merged_df(df):
         df[col] = lbl.transform(df.ix[:,col])
     return df
 
+
 def build_vars(df):
     """ This builds some miscellaneous variables for modeling """
     all_cols = df.columns.values
     weight_cols = []
     quant_col = []
+    specs_col = []
     for col in all_cols:
         if 'weight_median' in col:
             weight_cols.append(col)
         if 'materials_quantity' in col:
             quant_col.append(col)
+        if 'specs_' in col:
+            specs_col.append(col)
     df['comp_weight_sum'] = df[weight_cols].sum(axis=1)
     df['comp_tot_cnt'] = df[quant_col].sum(axis=1)
-    # Reduce number of levels in categorical vars
-    #for col in all_cols:
-    #    num_levels = len(df[col].drop_duplicates())
-    #    # Treat variables with fewer than 500 levels as categorical
-    #    if num_levels < 150:
-    #        # Recode levels with fewer than 300 obs as -1
-    #        df[col] = reduce_num_levels(df, col, 50)
+    df['specs_cnt'] = df[specs_col].sum(axis=1)
+    df['is_min_order_quantity'] = df['min_order_quantity'] > 0
+    df['ext_as_pct'] = df.elbow_extension_length_min/df.elbow_overall_length_min
     return df
 
 ############### Define Globals ########################
 DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
-
 ######################################################
-# Data dictionary for cleaning comp tables
 # Data dictionary for cleaning comp tables
 comp_dict = {
     'boss': [
@@ -237,7 +217,6 @@ comp_dict = {
     ]
 }
 
-
 # Load train and test data
 non_test = pd.read_csv(DATA_PATH + 'train_set.csv')
 non_test['is_test'] = 0
@@ -245,10 +224,15 @@ test = pd.read_csv(DATA_PATH + 'test_set.csv')
 test['is_test'] = 1
 # Append test and train data
 all_data = non_test.append(test)
-
 # Clean component data
+clean_type_connection(DATA_PATH, CLN_PATH)
 clean_component_data(comp_dict)
-
+# After cleaning, adaptor has more columns
+comp_dict['adaptor'] = [
+    'id', 'cat', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'cat',
+    'cat', 'num', 'num', 'num', 'num', 'num', 'bin', 'bin', 'num',
+    'bin', 'bin', 'bin', 'bin', 'bin', 'bin', 'bin', 'bin',
+]
 # Merge on needed data sets
 tube_merge_csvs = ['tube', 'bill_of_materials', 'specs']
 for csv in tube_merge_csvs:
@@ -257,8 +241,7 @@ for csv in tube_merge_csvs:
 for tube_end in ['a', 'x']:
     all_data = merge_noncomp(all_data, "tube_end_form",
                              "tube_end_" + tube_end, "end_form_id")
-all_data_wassembly = merge_on_assembly(all_data)
-all_data_wtubeend = merge_on_tube_end(all_data_wassembly)
+all_data_wtubeend = all_data
 for name, field_dict in comp_dict.iteritems():
     all_data_wtubeend = add_component_vars(all_data_wtubeend, name, field_dict)
 cleaned_all_data = clean_merged_df(all_data_wtubeend)

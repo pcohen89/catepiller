@@ -1,23 +1,20 @@
 __author__ = 'p_cohen'
 
+############## Import packages ########################
 import pandas as pd
-import collections
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.linear_model.ridge import RidgeCV
 from sklearn.linear_model import Lasso
-from sklearn import svm
 import numpy as np
 import math
-from sklearn import ensemble, preprocessing
-import time
-from sklearn.feature_selection import SelectKBest, f_regression
-import sklearn as skl
-from sklearn.feature_extraction import DictVectorizer
-
+import sys
+sys.path.append('/home/vagrant/xgboost/wrapper')
+import xgboost as xgb
 
 ############### Define Globals ########################
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
+SUBM_PATH = '/home/vagrant/caterpillar-peter/Submissions/'
+
 ############### Define Functions ########################
 def create_val_and_train(train, seed, ids, split_rt = .20):
     """
@@ -81,6 +78,32 @@ def lasso_var_select(df, feats):
             lassoed_vars.append(feats[i])
     return lassoed_vars
 
+def write_preds(df, mod, cv_fold, features, is_test=1):
+    """
+    This writes predictions froma  model into the test data
+    :param df: test observations
+    :return:
+    """
+    nm = 'preds'+str(cv_fold)
+    df[nm] = mod.predict(df[features])
+    df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    if is_test == 1:
+        df['cost'] += df[nm]/num_loops
+    return df
+
+def write_xgb_preds(df, xgb_data, mod, cv_fold, is_test=1):
+    """
+    This writes predictions froma  model into the test data
+    :param df: test observations
+    :return:
+    """
+    nm = 'preds'+str(cv_fold)
+    df[nm] = mod.predict(xgb_data)
+    df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    if is_test == 1:
+        df['cost'] += df[nm]/num_loops
+    return df
+
 ######################################################
 
 ### Load data ####
@@ -94,45 +117,80 @@ non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
 for var in non_feats:
     feats.remove(var)
 
-def write_preds(df, mod, cv_fold, feats, is_test=1):
-    """
-    This writes predictions froma  model into the test data
-    :param df: test observations
-    :return:
-    """
-    nm = 'preds'+str(cv_fold)
-    df[nm] = mod.predict(df[feats])
-    df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
-    if is_test == 1:
-        df['cost'] += df[nm]/num_loops
-    return df
+# good parameter:
+# gradient boosting: alpha=.16, estimators=150, depth=5
+# Random forest 1000 trees
+# SVR: rbf, small epsilons (.001) seem to be the best, but not that good
+
+### Set parameters
+avg_score = 0
+num_loops = 6
+start_num = 18
+is_xgb = 1
+is_forest = 0
+is_boost = 0
+test['cost'] = 0
+param = {'max_depth': 6, 'eta': .095, 'silent': 1}
 
 ### Run models
-avg_score = 0
-num_loops = 2
-test['cost'] = 0
-for cv_fold in range(0, num_loops):
+for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-    # recode target variable
-    trn['target'] = trn.cost.apply(lambda x: math.log(x+1))
-    # Use lasso to select variables
-    lassoed_vars = lasso_var_select(trn, feats)
-    # fit random forest
-    frst = RandomForestRegressor(n_estimators=50, n_jobs=8)
-    frst.fit(trn[lassoed_vars], trn['target'])
-    # Predict and rescale predictions
-    val = write_preds(val, frst, cv_fold, lassoed_vars, is_test=0)
+    # recode target variable to log(x+1) in trn and val
+    for df in [trn, val]:
+        df['target'] = df['cost'].apply(lambda x: math.log(x+1))
+    # Gradient boosting
+    if is_xgb:
+        xgb_trn = xgb.DMatrix(np.array(trn[feats]),
+                              label=np.array(trn['target']))
+        xgb_val = xgb.DMatrix(np.array(val[feats]),
+                              label=np.array(val['target']))
+        xgb_test = xgb.DMatrix(np.array(test[feats]))
+        xboost = xgb.train(param.items(), xgb_trn, 1500)
+        # Predict and rescale predictions
+        val = write_xgb_preds(val, xgb_val, xboost, cv_fold, is_test=0)
+        # Predict onto test
+        test = write_xgb_preds(test, xgb_test, xboost, cv_fold, is_test=1)
+    if is_forest:
+        # Use lasso to select variables
+        lassoed_vars = lasso_var_select(trn, feats)
+        mod = RandomForestRegressor(n_estimators=50, n_jobs=8)
+        mod.fit(trn[lassoed_vars], trn['target'])
+        for i in range(0, len(mod.feature_importances_)):
+            print "Feature %s has importance: %s" % (lassoed_vars[i],
+                                                mod.feature_importances_[i])
+    if is_boost:
+        mod = GradientBoostingRegressor(learning_rate=.02, n_estimators=150,
+                                         max_depth=1)
+        mod.fit(trn[lassoed_vars], trn['target'])
+    if is_boost | is_forest:
+        val = write_preds(val, mod, cv_fold, lassoed_vars, is_test=0)
     score = rmsle(val['cost'], val['preds'+str(cv_fold)])
-    #for i in range(0, len(frst.feature_importances_)):
-    #    print "Feature %s has importance: %s" % (feats[i],
-    #                                             frst.feature_importances_[i])
-    print "Score is: %s" % score
-    avg_score += score/num_loops
-    # Predict onto test
-    #test = write_preds(test, frst, cv_fold, lassoed_vars)
-avg_score
+    print score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(CLN_PATH+'randomforest from first data build.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'stacking first attempt.csv', index=False)
+
+num_loops = 6
+start_num = 12
+param = {'max_depth': 6, 'eta': .05, 'silent': 1}
+for eta in [ .085, .09, .095, .10, .105]:
+    avg_score = 0
+    param['eta'] = eta
+    for cv_fold in range(start_num, start_num+num_loops):
+        # Create trn val samples
+        trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+        # recode target variable to log(x+1)
+        trn['target'] = trn.cost.apply(lambda x: math.log(x+1))
+        val['target'] = val.cost.apply(lambda x: math.log(x+1))
+        # Gradient boosting
+        xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']))
+        xgb_val = xgb.DMatrix(np.array(val[feats]), label=np.array(val['target']))
+        xgb_test = xgb.DMatrix(np.array(test[feats]))
+        xboost = xgb.train(param.items(), xgb_trn, 1500)
+        # Predict and rescale predictions
+        val = write_xgb_preds(val, xgb_val, xboost, cv_fold, is_test=0)
+        score = rmsle(val['cost'], val['preds'+str(cv_fold)])
+        avg_score += score/num_loops
+    print "the score for eta=%s is %s" % (eta, avg_score)
