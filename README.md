@@ -6,26 +6,37 @@
 For example, if an assembly has two nuts, in this data build we would aggregate all of the fields associated with those two nuts (like average their weights, take max of their weights, etc) 
 
 Things still to do:
-- [ ] Encode categorical variables
-- [ ] Create field dictionary for component subtables
+- [x] Encode categorical variables
+- [x] Create field dictionary for component subtables
+- [x] Extract information from the names in type_connection, then merge on to adaptor
+- [ ] Manual variable creation
 
 Summary statistics planned to use:
-- [ ] Average numeric columns and binary
-- [ ] Take max and min
-- [ ] Count the number of instances of that comp type matched to the assembly
+- [x] Average numeric columns and binary
+- [x] Take max and min
+- [x] Count the number of instances of that comp type matched to the assembly
 
 ### 2. Don't merge to the sub-component tables, just count instances of each component on the assembly
 In this case, the data will have a feature for each component. The feature will count how many of that component are present on the assembly instance. Note, sometimes you have multiples of the exact same component noted in var component_quantity, so this approach will allow us to incorporate that information in a way that 1. misses
 
 ### 3. Try different outcome variables
 
-- [ ] Model with current data structure and include units as a field
+- [x] Model with current data structure and include units as a field
+- [ ] Somehow account for the fact that some tube assmblies have 4-7 observations associated with them
 
 ### 4. Misc data ideas
-- [ ] Sum weight from all components
+- [x] Sum weight from all components
 
 ## Modeling approaches
+- [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
+- [x] Gradient with stumps
+- [ ] Svm (small data means this might work okay)
+- [ ] penalized regression
+- [ ] NN (sigh)
+- [x] Try to get XGBOOST running
+- [ ] Two stage stacking approach (first stage you create predictions for bunch of model using only two components at a time, second state you fite a ridge to all varaibles plus first stage predictions)
 
 ## Blending approaches
+My current plan is to blend at the submission level. SO, I will try to create many submissions that are as good as possible using methods that are as different as possible and then do some sort of semi-naive blending of the final submissions. 
 
 
