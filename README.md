@@ -26,12 +26,12 @@ In this case, the data will have a feature for each component. The feature will 
 
 ### 4. Misc data ideas
 - [x] Sum weight from all components
-- [ ] total weight/ tube length
-- [ ] sum all tube-ish lengths
-- [ ] wall thickness * length
-- [ ] bends/length
-- [ ] Flag if end_a != end_x
-- [ ] Number of bends per bend radius (does this even make sense?)
+- [x] total weight/ tube length
+- [x] sum all tube-ish lengths
+- [x] wall thickness * length
+- [x] bends/length
+- [x] Flag if end_a != end_x
+- [x] Number of bends per bend radius (does this even make sense?)
 - [ ] Unique or rare part should be interacted with quantity maybe?
 - [ ] maybe sum the number of tube assemblys associated with the supplier
 
