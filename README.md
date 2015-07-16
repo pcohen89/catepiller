@@ -26,15 +26,23 @@ In this case, the data will have a feature for each component. The feature will 
 
 ### 4. Misc data ideas
 - [x] Sum weight from all components
+- [ ] total weight/ tube length
+- [ ] sum all tube-ish lengths
+- [ ] wall thickness * length
+- [ ] bends/length
+- [ ] Flag if end_a != end_x
+- [ ] Number of bends per bend radius (does this even make sense?)
+- [ ] Unique or rare part should be interacted with quantity maybe?
+- [ ] maybe sum the number of tube assemblys associated with the supplier
 
 ## Modeling approaches
 - [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
 - [x] Gradient with stumps
-- [ ] Svm (small data means this might work okay)
-- [ ] penalized regression
+- [x] Svm (small data means this might work okay)
+- [x] penalized regression
 - [ ] NN (sigh)
 - [x] Try to get XGBOOST running
-- [ ] Two stage stacking approach (first stage you create predictions for bunch of model using only two components at a time, second state you fite a ridge to all varaibles plus first stage predictions)
+- [x] Two stage stacking approach (first stage you create predictions for bunch of model using only two components at a time, second state you fite a ridge to all varaibles plus first stage predictions)
 
 ## Blending approaches
 My current plan is to blend at the submission level. SO, I will try to create many submissions that are as good as possible using methods that are as different as possible and then do some sort of semi-naive blending of the final submissions. 
