@@ -165,10 +165,15 @@ def build_vars(df):
         if 'specs_' in col:
             specs_col.append(col)
     df['comp_weight_sum'] = df[weight_cols].sum(axis=1)
+    df['apprx_density'] = df.comp_weight_sum/ (df.tube_length + .01)
+    df['length_x_wall'] = df.tube_length * df.tube_wall
+    df['radius_per_bend'] = df.tube_bend_radius/(df.tube_num_bends + .01)
+    df['bend_per_length'] = df.tube_bend_radius/(df.tube_length + .01)
     df['comp_tot_cnt'] = df[quant_col].sum(axis=1)
     df['specs_cnt'] = df[specs_col].sum(axis=1)
     df['is_min_order_quantity'] = df['min_order_quantity'] > 0
     df['ext_as_pct'] = df.elbow_extension_length_min/df.elbow_overall_length_min
+    df = df.fillna(-1)
     return df
 
 ############### Define Globals ########################
@@ -224,6 +229,11 @@ test = pd.read_csv(DATA_PATH + 'test_set.csv')
 test['is_test'] = 1
 # Append test and train data
 all_data = non_test.append(test)
+# Create supplier variable
+grpd = all_data.groupby('supplier')
+cnts_by_supplier = grpd['tube_assembly_id'].count().reset_index()
+cnts_by_supplier = cnts_by_supplier.rename(columns={0: 'supplier_freq'})
+all_data = all_data.merge(cnts_by_supplier, on='supplier')
 # Clean component data
 clean_type_connection(DATA_PATH, CLN_PATH)
 clean_component_data(comp_dict)

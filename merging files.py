@@ -29,23 +29,38 @@ def merge_subms(subm_dict, path, name, target):
     subm = pd.read_csv(path+'template.csv')
     for csv, weight in subm_dict.iteritems():
         score = pd.read_csv(path+csv)
-        subm[target] += weight * score[target]
+        score = score.rename(columns={'cost': 'target2'})
+        subm = subm.merge(score, on='id')
+        subm[target] += weight * subm['target2']
+        subm = subm.drop('target2', 1)
     subm.to_csv(path+name, index=False)
 
 
 ####################### Run Code #########################
 
 # Merge submissions
-submissions_to_merge = {'xgboost from first data build.csv': .4,
-                        'cv stack with new vars frst second stage internal 243.csv': .1,
-                        'stacking with all vars in forest.csv': .4,
-                        'stacking first attempt.csv': .02,
-                        'cv stack.csv': .02,
-                        'boost from first data build.csv': .02,
-                        'xgboost with deep trees.csv': .02,
-                        'randomforest from first data build.csv': .02}
+submissions_to_merge = {'1500 trees xgb.csv': .20,
+                        '2500 trees xgb.csv': .2,
+                        '2500 trees xgb w extra vars.csv': .05,
+                        'stacking with all vars in forest.csv': .05,
+                        'xgboost from first data build.csv': .05,
+                        'stacking with higher eta.csv': .20,
+                        'stacking with ridge vars.csv': .05,
+                        'cv stack with new vars frst second stage internal 243.csv': .05,
+                        'stacking first attempt.csv': .03,
+                        'cv stack.csv': .03,
+                        'boost from first data build.csv': .03,
+                        'xgboost with deep trees.csv': .03,
+                        'randomforest from first data build.csv': .03
+                        }
 
+
+total_weight = 0
+for key, val in submissions_to_merge.iteritems():
+    total_weight += val
+print total_weight
 merge_subms(submissions_to_merge, SUBM_PATH,
-            'blend after adding all vars to second stage.csv', 'cost')
-subm_correl('cv stack with new vars frst second stage internal 243.csv',
-            'stacking with all vars in forest.csv', 'id', 'cost')
+            'blend h.csv', 'cost')
+
+subm_correl('blend h.csv',
+            '2500 trees xgb.csv', 'id', 'cost')
