@@ -81,6 +81,13 @@ feats = list(non_test.columns.values)
 non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
 for var in non_feats:
     feats.remove(var)
+# Try to keep only continuous variables?
+for var in feats:
+    if ((len(all_data[var].drop_duplicates()) < 6) |
+            ('id' in var) |
+            ('max' in var) ):
+        feats.remove(var)
+len(feats)
 avg_score = 0
 first_loop = 0
 num_loops = 1
@@ -94,43 +101,45 @@ for cv_fold in range(start_num, start_num+num_loops):
         df['target'] = df['cost'].apply(lambda x: math.log(x+1))
     # Separate samples for first stage and second stage
     model = Sequential()
-    #model.add(Dropout(.2))
-    model.add(Dense(len(feats), 256))
+    model.add(Dropout(.1))
+    model.add(Dense(len(feats), 1000))
     model.add(Activation('relu'))
-    model.add(Dropout(.2))
-    model.add(Dense(256, 256))
+    model.add(Dropout(.8))
+    model.add(Dense(1000, 100))
     model.add(Activation('relu'))
-    model.add(Dropout(.2))
-    model.add(Dense(256, 1))
-    # Gradient boosting (choose TWO comp types a generate models on using those
-    # and core features)
-    # Fit second stage model
-    sgd = SGD(lr=0.15, momentum=.02, nesterov=True)
+    model.add(Dropout(.3))
+    model.add(Dense(100, 1))
+    #sgd = SGD(lr=0.15, momentum=.02, nesterov=True)
     # Rescale data
     scaler = StandardScaler()
-    X = trn[feats]
-    scaler.fit(X)
-    X = scaler.transform(X)
-    model.compile(loss='mean_squared_error', optimizer='rmsprop')
-    model.fit(X,
-              trn.target.values,validation_split=0.15)
-    # Write predictions
+    scaler.fit(all_data[feats])
+    X = scaler.transform(trn[feats])
     val_X = scaler.transform(val[feats])
     test_X = scaler.transform(test[feats])
-    val['preds_final'] = 0
-    val['preds_final'] = write_nn_preds(val_X, model, '_final', feats, is_test=0)
+    # Fit model
+    model.compile(loss='mse', optimizer='rmsprop')
+    model.fit(X, trn.target.values, batch_size=32,
+              nb_epoch=30, verbose=2, validation_split=0.15)
+    # Write predictions
+    val['preds_final'] = model.predict(val_X)
     val['preds_final'] = val['preds_final'].apply(lambda x: math.exp(x)-1)
-    test['preds_final'] = write_nn_preds(test_X, model, '_final', feats, is_test=0)
-    test['cost'] = test['preds_final'].apply(lambda x: math.exp(x)-1)
+    test['cost'] = model.predict(test_X)
+    test['cost'] = test['cost'].apply(lambda x: math.exp(x)-1)
     # Score loop
     score = rmsle(val['cost'], val['preds_final'])
     print "Score for loop %s is: %s" % (cv_fold, score)
     avg_score += score/num_loops
 avg_score
 
-test['cost'] = test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].mean(axis=1)
-test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].corr()
+prds = ['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']
+test['cost'] = test[preds].mean(axis=1)
+test[preds].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
 test[['id', 'cost']].to_csv(SUBM_PATH+'uhhh neural network.csv', index=False)
+
+# Figure out what is breaking
+for feat in feats:
+    topic = "%s: min: %s, max: %s"
+    print topic % (feat, (val[feat].min()-val[feat].mean())/ val[feat].std(), (val[feat].max()-val[feat].mean())/val[feat].std())

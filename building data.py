@@ -5,20 +5,6 @@ import math
 from sklearn import ensemble, preprocessing
 
 ############### Define Functions ########################
-def rename_nonId(x, merge_id, nm):
-    """
-    This makes sure that the column x is not the column that will be used
-    to merge accross dfs and if it is not it renames that column
-
-    :param x: column of dataframe
-    :param merge_id: name of the merge id
-    :param nm: name of new variable
-    :return:
-    """
-    if x == merge_id:
-        return x
-    return nm + '_' + x
-
 def merge_noncomp(df, nm, left_merge, right_merge):
     """
     Merges the non component data sets onto the main training df
@@ -31,8 +17,10 @@ def merge_noncomp(df, nm, left_merge, right_merge):
     # Read in csv
     merge_df = pd.read_csv(DATA_PATH + nm +'.csv')
     # Rename columns to format tablename_column_name
-    merge_df.rename(columns=lambda x: rename_nonId(x, right_merge, nm),
-                    inplace=True)
+    columns = merge_df.columns.values
+    for col in columns:
+        if col != right_merge:
+            merge_df.rename(columns={col: nm + '_' + col}, inplace=True)
     # Merge
     df = pd.merge(df, merge_df, left_on=left_merge,
                   right_on=right_merge, how='left')
@@ -72,11 +60,19 @@ def clean_component_data(comp_dict):
         df.to_csv(CLN_PATH + 'comp_' + name + '.csv', index=False)
 
 def clean_type_connection(path, outpath):
+    """
+    :param path: path where type_connection.csv is located
+    :param outpath: path to save new type_connection.csv
+    :return:
+    """
+    # Read data
     df_connect = pd.read_csv(path+'type_connection.csv')
+    # Build variables
     df_connect['has_flare'] = df_connect['name'].apply(lambda x: 'Flare' in x)
     df_connect['has_flange'] = df_connect['name'].apply(lambda x: 'Flange' in x)
     df_connect['has_metric'] = df_connect['name'].apply(lambda x: 'Metric' in x)
     df_connect['has_sae'] = df_connect['name'].apply(lambda x: 'SAE' in x)
+    # Export
     df_connect.to_csv(outpath + 'type_connection.csv', index=False)
 
 def clean_specs(path):
@@ -84,7 +80,6 @@ def clean_specs(path):
     Re-shapes specs, because spec1 = SP-004 and spec2 = SP-004 intuitively
     should mean the same thing but because of an artifact of the storage
     they will be treated as totally unrelated.
-
 
     :param specs: Specs.csv data set from caterpiller comp
     :param path: path to save new specs file to
@@ -163,9 +158,10 @@ def add_component_vars(df, comp, comp_var_list):
         # Rename columns to format tablename_column_name
         merge_df.rename(columns=lambda c: comp + str(slot) + '_' + c,
                         inplace=True)
-        # Merge
+        # Define merging variables
         left_merge_var = 'bill_of_materials_' + merge_var + '_' + str(slot)
         right_merge_var = comp + str(slot) + '_' + merge_var
+        # Merge
         df = pd.merge(df, merge_df, how='left', left_on=left_merge_var,
                       right_on=right_merge_var)
     df = aggregate_compslots(df, comp, comp_var_list)
@@ -242,7 +238,7 @@ def build_vars(df):
 ############### Define Globals ########################
 DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
-######################################################
+
 # Data dictionary for cleaning comp tables
 comp_dict = {
     'boss': [
@@ -282,6 +278,10 @@ comp_dict = {
         'bin', 'num'
     ]
 }
+
+#############################################################################
+############### Run live code ###############################################
+#############################################################################
 
 # Load train and test data
 non_test = pd.read_csv(DATA_PATH + 'train_set.csv')

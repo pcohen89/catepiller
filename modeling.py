@@ -16,7 +16,7 @@ CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
 SUBM_PATH = '/home/vagrant/caterpillar-peter/Submissions/'
 
 ############### Define Functions ########################
-def create_val_and_train(train, seed, ids, split_rt = .20):
+def create_val_and_train(trn, seed, ids, split = .20):
     """
         this will create a validate and train
 
@@ -28,24 +28,22 @@ def create_val_and_train(train, seed, ids, split_rt = .20):
     """
     np.random.seed(seed)
     # Get vector of de-dupped values of ids
-    id_dat = pd.DataFrame(train[ids].drop_duplicates())
+    id_dat = pd.DataFrame(trn[ids].drop_duplicates())
     # creating random vector to split train val on
     vect_len = len(id_dat.ix[:, 0])
-    id_dat['rand_vals'] = (np.array(np.random.rand(vect_len,1)))
-    train = pd.merge(train, id_dat, on=ids)
+    id_dat['rand'] = (np.array(np.random.rand(vect_len,1)))
+    trn = pd.merge(trn, id_dat, on=ids)
     # splits train into modeling and validating portions
-    trn_for_mods = train[train["rand_vals"] > split_rt]
-    trn_for_val = train[train["rand_vals"] <= split_rt]
+    for_mods, for_val = trn[trn["rand"] > split], trn[trn["rand"] <= split]
     # Drop temp columns
     # drop rand_vals
-    trn_for_mods = trn_for_mods.drop('rand_vals', axis=1)
-    trn_for_val = trn_for_val.drop('rand_vals', axis=1)
-    return trn_for_mods, trn_for_val
-
-#### __author__ = 'benhamner'
+    for df in [for_mods, for_val]:
+        df = df.drop('rand', axis=1)
+    return for_mods, for_val
 
 def rmsle(actual, predicted):
     """
+    original author = 'benhamner'
     Computes the root mean squared log error.
     This function computes the root mean squared log error between two lists
     of numbers.
@@ -82,26 +80,24 @@ def lasso_var_select(df, feats):
             lassoed_vars.append(feats[i])
     return lassoed_vars
 
-def write_preds(df, mod, cv_fold, features, is_test=1):
+def write_preds(df, mod, nm, features, is_test=1):
     """
     This writes predictions froma  model into the test data
     :param df: test observations
     :return:
     """
-    nm = 'preds'+str(cv_fold)
     df[nm] = mod.predict(df[features])
     df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
     if is_test == 1:
         df['cost'] += df[nm]/num_loops
     return df
 
-def write_xgb_preds(df, xgb_data, mod, cv_fold, is_test=1):
+def write_xgb_preds(df, xgb_data, mod, nm, is_test=1):
     """
     This writes predictions froma  model into the test data
     :param df: test observations
     :return:
     """
-    nm = 'preds'+str(cv_fold)
     # Predict xgb model
     df[nm] = mod.predict(xgb_data)
     # Rescale the prediciton
@@ -112,7 +108,6 @@ def write_xgb_preds(df, xgb_data, mod, cv_fold, is_test=1):
     return df
 
 ######################################################
-
 ### Load data ####
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
 non_test = all_data[all_data.is_test == 0]
@@ -123,11 +118,6 @@ feats = list(all_data.columns.values)
 non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
 for var in non_feats:
     feats.remove(var)
-
-# good parameter:
-# gradient boosting: alpha=.16, estimators=150, depth=5
-# Random forest 1000 trees
-# SVR: rbf, small epsilons (.001) seem to be the best, but not that good
 
 ### Set parameters
 avg_score = 0
@@ -149,8 +139,9 @@ for cv_fold in range(start_num, start_num+num_loops):
     xgb_test = xgb.DMatrix(np.array(test[feats]))
     xboost = xgb.train(param.items(), xgb_trn, 2500)
     # Predict and rescale predictions
-    val = write_xgb_preds(val, xgb_val, xboost, cv_fold, is_test=0)
-    test = write_xgb_preds(test, xgb_test, xboost, cv_fold, is_test=1)
+    name = 'preds'+str(cv_fold)
+    val = write_xgb_preds(val, xgb_val, xboost, name, is_test=0)
+    test = write_xgb_preds(test, xgb_test, xboost, name, is_test=1)
     # Save score
     score = rmsle(val['cost'], val['preds'+str(cv_fold)])
     avg_score += score/num_loops
@@ -174,8 +165,4 @@ for cv_fold in range(1, 2):
     for i in range(0, len(frst.feature_importances_)):
         print "Feature %s has importance: %s" % (feats[i],
                                          frst.feature_importances_[i])
-    # Predict and rescale predictions
-    val = write_xgb_preds(val, xgb_val, xboost, cv_fold, is_test=0)
-    score = rmsle(val['cost'], val['preds'+str(cv_fold)])
-    print score
-    avg_score += score/num_loops
+
