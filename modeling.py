@@ -132,9 +132,9 @@ for var in non_feats:
 ### Set parameters
 avg_score = 0
 num_loops = 6
-start_num = 18
+start_num = 12
 test['cost'] = 0
-param = {'max_depth': 6, 'eta': .06, 'silent': 1}
+param = {'max_depth': 6, 'eta': .057, 'silent': 1}
 feats.remove('supplier_freq')
 ### Run models
 for cv_fold in range(start_num, start_num+num_loops):
@@ -158,48 +158,24 @@ for cv_fold in range(start_num, start_num+num_loops):
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees xgb w extra vars wo supplier breach.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees xgb w spec vars.csv', index=False)
 
-num_loops = 6
-start_num = 12
-
-param = {'max_depth': 6, 'eta': .05, 'silent': 1}
-for eta in [ .06, .07, .08]:
-    avg_score = 0
-    param['eta'] = eta
-    for cv_fold in range(start_num, start_num+num_loops):
-        # Create trn val samples
-        trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-        # recode target variable to log(x+1)
-        trn['target'] = trn.cost.apply(lambda x: math.log(x+1))
-        val['target'] = val.cost.apply(lambda x: math.log(x+1))
-        # Gradient boosting
-        xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']))
-        xgb_val = xgb.DMatrix(np.array(val[feats]), label=np.array(val['target']))
-        xgb_test = xgb.DMatrix(np.array(test[feats]))
-        xboost = xgb.train(param.items(), xgb_trn, 2500)
-        # Predict and rescale predictions
-        val = write_xgb_preds(val, xgb_val, xboost, cv_fold, is_test=0)
-        score = rmsle(val['cost'], val['preds'+str(cv_fold)])
-        print score
-        avg_score += score/num_loops
-    print "the score for eta=%s is %s" % (eta, avg_score)
-
+# Code for browsing feature importances
 feats.remove('bend_per_length')
-for cv_fold in range(start_num, start_num+1):
-        # Create trn val samples
-        trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-        # recode target variable to log(x+1)
-        trn['target'] = trn.cost.apply(lambda x: math.log(x+1))
-        val['target'] = val.cost.apply(lambda x: math.log(x+1))
-        # Gradient boosting
-        frst = RandomForestRegressor(n_estimators=100, n_jobs=8)
-        frst.fit(trn[feats], trn['target'])
-        for i in range(0, len(frst.feature_importances_)):
-            print "Feature %s has importance: %s" % (feats[i],
-                                             frst.feature_importances_[i])
-        # Predict and rescale predictions
-        val = write_xgb_preds(val, xgb_val, xboost, cv_fold, is_test=0)
-        score = rmsle(val['cost'], val['preds'+str(cv_fold)])
-        print score
-        avg_score += score/num_loops
+for cv_fold in range(1, 2):
+    # Create trn val samples
+    trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+    # recode target variable to log(x+1)
+    trn['target'] = trn.cost.apply(lambda x: math.log(x+1))
+    val['target'] = val.cost.apply(lambda x: math.log(x+1))
+    # Gradient boosting
+    frst = RandomForestRegressor(n_estimators=100, n_jobs=8)
+    frst.fit(trn[feats], trn['target'])
+    for i in range(0, len(frst.feature_importances_)):
+        print "Feature %s has importance: %s" % (feats[i],
+                                         frst.feature_importances_[i])
+    # Predict and rescale predictions
+    val = write_xgb_preds(val, xgb_val, xboost, cv_fold, is_test=0)
+    score = rmsle(val['cost'], val['preds'+str(cv_fold)])
+    print score
+    avg_score += score/num_loops

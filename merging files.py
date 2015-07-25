@@ -13,7 +13,7 @@ def subm_correl(subm1, subm2, id, target):
     """
     subm1 = pd.read_csv(SUBM_PATH + subm1)
     subm2 = pd.read_csv(SUBM_PATH + subm2)
-    subm2 = subm2.rename(columns={'cost': 'target2'})
+    subm2 = subm2.rename(columns={target: 'target2'})
     merged_df = subm1.merge(subm2, on=id)
     return merged_df.corr()
 
@@ -40,11 +40,13 @@ def merge_subms(subm_dict, path, name, target):
 
 # Merge submissions
 submissions_to_merge = {'1500 trees xgb.csv': .20,
-                        '2500 trees xgb.csv': .2,
+                        '2500 trees xgb.csv': .1,
+                        '2500 trees xgb w spec vars.csv': .1,
                         '2500 trees xgb w extra vars.csv': .05,
                         'stacking with all vars in forest.csv': .05,
+                        'stacking with three comp.csv': .1,
                         'xgboost from first data build.csv': .05,
-                        'stacking with higher eta.csv': .20,
+                        'stacking with higher eta.csv': .10,
                         'stacking with ridge vars.csv': .05,
                         'cv stack with new vars frst second stage internal 243.csv': .05,
                         'stacking first attempt.csv': .03,
@@ -54,13 +56,12 @@ submissions_to_merge = {'1500 trees xgb.csv': .20,
                         'randomforest from first data build.csv': .03
                         }
 
-
 total_weight = 0
 for key, val in submissions_to_merge.iteritems():
     total_weight += val
 print total_weight
 merge_subms(submissions_to_merge, SUBM_PATH,
-            'blend h.csv', 'cost')
+            'blend j.csv', 'cost')
 
-subm_correl('blend h.csv',
-            '2500 trees xgb.csv', 'id', 'cost')
+subm_correl('uhhh neural network.csv',
+            '2500 trees xgb w spec vars.csv', 'id', 'cost')

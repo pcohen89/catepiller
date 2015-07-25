@@ -1,11 +1,20 @@
 __author__ = 'p_cohen'
 
 import pandas as pd
-import numpy as np
+import math
 from sklearn import ensemble, preprocessing
 
 ############### Define Functions ########################
 def rename_nonId(x, merge_id, nm):
+    """
+    This makes sure that the column x is not the column that will be used
+    to merge accross dfs and if it is not it renames that column
+
+    :param x: column of dataframe
+    :param merge_id: name of the merge id
+    :param nm: name of new variable
+    :return:
+    """
     if x == merge_id:
         return x
     return nm + '_' + x
@@ -31,7 +40,9 @@ def merge_noncomp(df, nm, left_merge, right_merge):
 
 def clean_component_data(comp_dict):
     """
-    Reads in and cleans a component data set
+    Reads in and cleans a Caterpiller tube component data sets according to
+    the columns types (numeric, character, binary, etc.) stored in feat_dict
+    Some particular dfs such as adaptor have special cleaning steps
     """
     for name, feat_dict in comp_dict.iteritems():
         df = pd.read_csv(DATA_PATH + 'comp_' + name + '.csv')
@@ -68,9 +79,46 @@ def clean_type_connection(path, outpath):
     df_connect['has_sae'] = df_connect['name'].apply(lambda x: 'SAE' in x)
     df_connect.to_csv(outpath + 'type_connection.csv', index=False)
 
+def clean_specs(path):
+    """
+    Re-shapes specs, because spec1 = SP-004 and spec2 = SP-004 intuitively
+    should mean the same thing but because of an artifact of the storage
+    they will be treated as totally unrelated.
+
+
+    :param specs: Specs.csv data set from caterpiller comp
+    :param path: path to save new specs file to
+    """
+    # Read in csv
+    df = pd.read_csv(DATA_PATH + 'specs.csv')
+    # Initialize list of all values that appear
+    spec_vals = df.spec1.drop_duplicates()
+    for spec_num in range(2, 11):
+        spec_vals = spec_vals.append(df['spec'+str(spec_num)].drop_duplicates())
+    spec_vals = list(spec_vals)
+    # Check to see if nan
+    spec_vals = [s for s in spec_vals if s == s]
+    # Make binaries to represent whether tube has that spec
+    for spec in spec_vals:
+        temp_list = []
+        # Create true false for whether a column has a spec
+        for spec_col in range(1, 11):
+            cnt = str(spec_col)
+            temp_list.append('temp'+cnt)
+            df['temp'+cnt] = df['spec'+cnt].apply(lambda x: spec in str(x))
+        # Record whether any column contains spec
+        df['s_'+spec[3:]] = df[temp_list].max(axis=1)
+        # Drop column if spec value is very rare
+        if df['s_'+spec[3:]].mean() < .0025:
+            df = df.drop('s_'+spec[3:], axis=1)
+        df = df.drop(temp_list, axis=1)
+    df.to_csv(DATA_PATH + 'reshaped_specs.csv', index=False)
+
 def aggregate_compslots(df, comp, comp_var_list):
     """
-    If a given component type has multiple instances in one asssembly (i.e an
+    This function adds component data to the main df using matches from
+    bill of materials.
+    If a given component type has multiple instances in one assembly (i.e an
     assembly has three nuts on it) then this function creates summary statistics
     that aggregate field values for each instance of that component type
     """
@@ -130,11 +178,11 @@ def clean_merged_df(df):
     """
     # Remove all ids other than tube_assembly_id
     cols = list(df.columns.values)
-    # Separate date variable
+    # Separate date variable (using old python, built in date functions are
+    # out of date and I can't find old docs)
     df['year'] = df.quote_date.apply(lambda x: x[0:4])
     df['month'] = df.quote_date.apply(lambda x: x[5:7])
     df['dayofyear'] = df.quote_date.apply(lambda x: x[8:10])
-    df.drop('quote_date', axis=1)
     # Create list of categorical and numeric vars
     num_cols = df._get_numeric_data().columns.values
     for col in num_cols:
@@ -144,19 +192,33 @@ def clean_merged_df(df):
     cat_cols = list(set(cols)-set(num_cols)-set(['tube_assembly_id',]))
     # Encode categoricals as numerics
     for col in cat_cols:
+        # Fill column missings with -1
         df[col] = df[col].fillna(value="-1")
         lbl = preprocessing.LabelEncoder()
         lbl.fit(list(df[col]))
         df[col] = lbl.transform(df.ix[:,col])
     return df
 
+def add_supp_var(df):
+    """
+    Creates a few supplier variables
+    :param df: dataframe to create variables in
+    :return: dataframe with supplier variable
+    """
+    grpd = df.groupby('supplier')
+    cnts_by_supplier = grpd['tube_assembly_id'].count().reset_index()
+    cnts_by_supplier = cnts_by_supplier.rename(columns={0: 'supplier_freq'})
+    df = df.merge(cnts_by_supplier, on='supplier')
+    return df
 
 def build_vars(df):
-    """ This builds some miscellaneous variables for modeling """
+    """ This builds some miscellaneous variables that I
+    manually determined could be useful for modeling """
     all_cols = df.columns.values
     weight_cols = []
     quant_col = []
     specs_col = []
+    # Create lists of columns with similar naming conventions
     for col in all_cols:
         if 'weight_median' in col:
             weight_cols.append(col)
@@ -164,6 +226,7 @@ def build_vars(df):
             quant_col.append(col)
         if 'specs_' in col:
             specs_col.append(col)
+    # Create miscellaenous variables
     df['comp_weight_sum'] = df[weight_cols].sum(axis=1)
     df['apprx_density'] = df.comp_weight_sum/ (df.tube_length + .01)
     df['length_x_wall'] = df.tube_length * df.tube_wall
@@ -194,19 +257,13 @@ comp_dict = {
         'id', 'cat', 'num', 'num', 'num', 'num', 'num', 'num', 'num',
         'cat', 'cat', 'num', 'bin', 'bin', 'bin', 'num'
     ],
-    'float': [
-        'id', 'cat', 'num', 'num', 'num', 'bin', 'num'
-    ],
-    'hfl': [
-        'id', 'cat', 'num', 'cat', 'cat', 'cat', 'bin', 'bin', 'num'
-    ],
+    'float': ['id', 'cat', 'num', 'num', 'num', 'bin', 'num'],
+    'hfl': ['id', 'cat', 'num', 'cat', 'cat', 'cat', 'bin', 'bin', 'num'],
     'nut': [
         'id', 'cat', 'num', 'num', 'num', 'num', 'num', 'num',
         'bin', 'bin', 'num'
     ],
-    'other': [
-        'id', 'cat', 'num'
-    ],
+    'other': ['id', 'cat', 'num'],
     'sleeve': [
         'id', 'cat', 'cat', 'num', 'num', 'num', 'bin', 'bin', 'bin', 'num'
     ],
@@ -214,11 +271,15 @@ comp_dict = {
         'id', 'cat', 'num', 'num', 'num', 'num', 'num', 'cat', 'bin', 'bin',
         'bin', 'num'
     ],
+    'tee': [
+        'id', 'cat', 'num', 'num', 'num', 'num', 'num', 'num', 'cat',
+        'cat', 'cat', 'cat', 'cat', 'num'
+    ],
     'threaded': [
-        'id', 'cat', 'num', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num',
-        'cat', 'cat', 'num', 'num', 'num', 'num', 'cat', 'cat', 'num', 'num',
-        'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'bin', 'bin',
-        'num'
+        'id', 'cat', 'num', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num',
+        'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'cat', 'cat', 'num',
+        'num', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'bin',
+        'bin', 'num'
     ]
 }
 
@@ -230,13 +291,11 @@ test['is_test'] = 1
 # Append test and train data
 all_data = non_test.append(test)
 # Create supplier variable
-grpd = all_data.groupby('supplier')
-cnts_by_supplier = grpd['tube_assembly_id'].count().reset_index()
-cnts_by_supplier = cnts_by_supplier.rename(columns={0: 'supplier_freq'})
-all_data = all_data.merge(cnts_by_supplier, on='supplier')
-# Clean component data
+all_data = add_supp_var(all_data)
+# Clean data sets
 clean_type_connection(DATA_PATH, CLN_PATH)
 clean_component_data(comp_dict)
+clean_specs(DATA_PATH)
 # After cleaning, adaptor has more columns
 comp_dict['adaptor'] = [
     'id', 'cat', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'cat',
@@ -244,17 +303,22 @@ comp_dict['adaptor'] = [
     'bin', 'bin', 'bin', 'bin', 'bin', 'bin', 'bin', 'bin',
 ]
 # Merge on needed data sets
-tube_merge_csvs = ['tube', 'bill_of_materials', 'specs']
+tube_merge_csvs = ['tube', 'bill_of_materials', 'reshaped_specs']
 for csv in tube_merge_csvs:
     all_data = merge_noncomp(all_data, csv, 'tube_assembly_id',
                              'tube_assembly_id')
 for tube_end in ['a', 'x']:
     all_data = merge_noncomp(all_data, "tube_end_form",
                              "tube_end_" + tube_end, "end_form_id")
+# Rename data after adding datasets
 all_data_wtubeend = all_data
+# Iteratively merge on each component data set
 for name, field_dict in comp_dict.iteritems():
     all_data_wtubeend = add_component_vars(all_data_wtubeend, name, field_dict)
+# Clean the resultant dataframe
 cleaned_all_data = clean_merged_df(all_data_wtubeend)
+# Build modeling vars
 all_data_complete = build_vars(cleaned_all_data)
+# Export
 all_data_complete.to_csv(CLN_PATH + "full_data.csv", index=False)
 

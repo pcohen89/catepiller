@@ -155,6 +155,7 @@ for cv_fold in range(start_num, start_num+num_loops):
                                       label=np.array(mod_trn['target']))
                 xgb_val = xgb.DMatrix(np.array(val[stage1_feats]))
                 xgb_test = xgb.DMatrix(np.array(test[stage1_feats]))
+                # Fit xgboost
                 xboost = xgb.train(param.items(), xgb_feat_trn, 500)
                 # Create scaled predictions
                 nm = 'frststage' + types[i] + types[j]
@@ -193,4 +194,4 @@ test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'stacking with higher eta.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'stacking with three comp.csv', index=False)
