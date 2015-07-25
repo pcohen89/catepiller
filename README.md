@@ -9,8 +9,8 @@ Things still to do:
 - [x] Encode categorical variables
 - [x] Create field dictionary for component subtables
 - [x] Extract information from the names in type_connection, then merge on to adaptor
-- [ ] Manual variable creation
-- [ ] REshpae the spec data to indicators
+- [x] Manual variable creation
+- [x] Reshape the spec data to indicators
 
 Summary statistics planned to use:
 - [x] Average numeric columns and binary
@@ -23,7 +23,7 @@ In this case, the data will have a feature for each component. The feature will 
 ### 3. Try different outcome variables
 
 - [x] Model with current data structure and include units as a field
-- [ ] Somehow account for the fact that some tube assmblies have 4-7 observations associated with them
+- [x] Somehow account for the fact that some tube assmblies have 4-7 observations associated with them
 
 ### 4. Misc data ideas
 - [x] Sum weight from all components
@@ -34,14 +34,14 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Flag if end_a != end_x
 - [x] Number of bends per bend radius (does this even make sense?)
 - [ ] Unique or rare part should be interacted with quantity maybe?
-- [ ] maybe sum the number of tube assemblys associated with the supplier
+- [x] maybe sum the number of tube assemblies associated with the supplier
 
 ## Modeling approaches
 - [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
 - [x] Gradient with stumps
 - [x] Svm (small data means this might work okay)
 - [x] penalized regression
-- [ ] NN (sigh)
+- [x] NN (sigh, finding a reasonable specification has been a nightmare)
 - [x] Try to get XGBOOST running
 - [x] Two stage stacking approach (first stage you create predictions for bunch of model using only two components at a time, second state you fite a ridge to all varaibles plus first stage predictions)
 
