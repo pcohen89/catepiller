@@ -10,6 +10,7 @@ Things still to do:
 - [x] Create field dictionary for component subtables
 - [x] Extract information from the names in type_connection, then merge on to adaptor
 - [ ] Manual variable creation
+- [ ] REshpae the spec data to indicators
 
 Summary statistics planned to use:
 - [x] Average numeric columns and binary
