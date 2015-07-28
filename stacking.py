@@ -208,6 +208,7 @@ for cv_fold in range(start_num, start_num+num_loops):
     model = RandomForestRegressor(n_estimators=2000, n_jobs=8)
     model.fit(mod_trn[stage2_feats], mod_trn.target.values)
     val = write_preds(val, model, cv_fold, stage2_feats)
+    test = write_preds(test, model, cv_fold, stage2_feats)
     # Score loop
     score = rmsle(val['cost'], val['preds'+str(cv_fold)])
     print "Score for fold %s is: %s" % (str(param['eta']), score)

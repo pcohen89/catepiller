@@ -28,8 +28,11 @@ def merge_subms(subm_dict, path, name, target):
     """
     subm = pd.read_csv(path+'template.csv')
     for csv, weight in subm_dict.iteritems():
+        # Read in a new csv
         score = pd.read_csv(path+csv)
-        score = score.rename(columns={'cost': 'target2'})
+        # rename target to avoid merge issues
+        score = score.rename(columns={target: 'target2'})
+        # Merge files to be averaged
         subm = subm.merge(score, on='id')
         subm[target] += weight * subm['target2']
         subm = subm.drop('target2', 1)
@@ -39,29 +42,29 @@ def merge_subms(subm_dict, path, name, target):
 ####################### Run Code #########################
 
 # Merge submissions
-submissions_to_merge = {'1500 trees xgb.csv': .15,
-                        '2500 trees xgb.csv': .1,
-                        '2500 trees xgb w spec vars.csv': .05,
-                        '2500 trees xgb w extra vars.csv': .05,
-                        'stacking with xgboost second stage all vars.csv': .25,
-                        'stacking with all vars in forest.csv': .05,
-                        'xgboost from first data build.csv': .05,
-                        'stacking with higher eta.csv': .05,
-                        'stacking with ridge vars.csv': .05,
-                        'cv stack with new vars frst second stage internal 243.csv': .05,
-                        'stacking first attempt.csv': .03,
-                        'cv stack.csv': .03,
-                        'boost from first data build.csv': .03,
-                        'xgboost with deep trees.csv': .03,
-                        'randomforest from first data build.csv': .03
-                        }
+subs_to_merge = {
+    '1500 trees xgb.csv': .15,
+    '2500 trees xgb.csv': .1,
+    '2500 trees xgb w spec vars.csv': .05,
+    '2500 trees xgb w extra vars.csv': .05,
+    'stacking with xgboost second stage all vars.csv': .25,
+    'stacking with all vars in forest.csv': .05,
+    'xgboost from first data build.csv': .05,
+    'stacking with higher eta.csv': .05,
+    'stacking with ridge vars.csv': .05,
+    'cv stack with new vars frst second stage internal 243.csv': .05,
+    'stacking first attempt.csv': .03,
+    'cv stack.csv': .03,
+    'boost from first data build.csv': .03,
+    'xgboost with deep trees.csv': .03,
+    'randomforest from first data build.csv': .03
+}
 
 total_weight = 0
-for key, val in submissions_to_merge.iteritems():
+for key, val in subs_to_merge.iteritems():
     total_weight += val
-print total_weight
-merge_subms(submissions_to_merge, SUBM_PATH,
-            'blend k.csv', 'cost')
+print "The total weight should be 1.0, it is: %s" % (total_weight)
+merge_subms(subs_to_merge, SUBM_PATH, 'blend k.csv', 'cost')
 
 subm_correl('stacking with xgboost second stage all vars.csv',
             'stacking with xgboost second stage.csv', 'id', 'cost')
