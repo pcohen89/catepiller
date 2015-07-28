@@ -307,6 +307,7 @@ tube_merge_csvs = ['tube', 'bill_of_materials', 'reshaped_specs']
 for csv in tube_merge_csvs:
     all_data = merge_noncomp(all_data, csv, 'tube_assembly_id',
                              'tube_assembly_id')
+# Merge on tube ends, matching to both sides
 for tube_end in ['a', 'x']:
     all_data = merge_noncomp(all_data, "tube_end_form",
                              "tube_end_" + tube_end, "end_form_id")

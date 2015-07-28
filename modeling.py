@@ -16,30 +16,39 @@ CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
 SUBM_PATH = '/home/vagrant/caterpillar-peter/Submissions/'
 
 ############### Define Functions ########################
-def create_val_and_train(trn, seed, ids, split = .20):
+def create_val_and_train(df, seed, ids, split_rt = .20):
     """
-        this will create a validate and train
+        Creates two samples (generally used to create
+        train and validation samples)
 
+        Parameters
+        ----------------------------------------------------
         ids: this is the level of randomization, so if you want to
         randomize countries, rather than cities, you would
         set this to 'countries'
 
         split_rate: pct of data to assign as validation
+
+        Output
+        ----------------------------------------------------
+        trn_for_mods (1-split_rate of df), trn_for_val (split_rate of data)
+
+
     """
     np.random.seed(seed)
     # Get vector of de-dupped values of ids
-    id_dat = pd.DataFrame(trn[ids].drop_duplicates())
-    # creating random vector to split train val on
+    id_dat = pd.DataFrame(df[ids].drop_duplicates())
+    # Create random vector to split train val on
     vect_len = len(id_dat.ix[:, 0])
-    id_dat['rand'] = (np.array(np.random.rand(vect_len,1)))
-    trn = pd.merge(trn, id_dat, on=ids)
-    # splits train into modeling and validating portions
-    for_mods, for_val = trn[trn["rand"] > split], trn[trn["rand"] <= split]
-    # Drop temp columns
+    id_dat['rand_vals'] = (np.array(np.random.rand(vect_len,1)))
+    df = pd.merge(df, id_dat, on=ids)
+    # split data into two dfs
+    trn_for_mods = df[df.rand_vals > split_rt]
+    trn_for_val = df[df.rand_vals <= split_rt]
     # drop rand_vals
-    for df in [for_mods, for_val]:
-        df = df.drop('rand', axis=1)
-    return for_mods, for_val
+    trn_for_val = trn_for_val.drop('rand_vals', axis=1)
+    trn_for_mods = trn_for_mods.drop('rand_vals', axis=1)
+    return trn_for_mods, trn_for_val
 
 def rmsle(actual, predicted):
     """
@@ -80,29 +89,50 @@ def lasso_var_select(df, feats):
             lassoed_vars.append(feats[i])
     return lassoed_vars
 
-def write_preds(df, mod, nm, features, is_test=1):
+def write_preds(df, mod, name, features):
     """
-    This writes predictions froma  model into the test data
-    :param df: test observations
-    :return:
+    Writes predictions from a model into a dataframe, transforms them
+    according to e^x - 1
+
+    Parameters
+    -----------
+    df: data to build predictions into and from
+    mod: a predictive model
+    name: name of predictions
+    features: features used in model
+
+    Output
+    ----------
+    dataframe with predictions labeled as 'preds'+name
     """
+    nm = 'preds'+str(name)
     df[nm] = mod.predict(df[features])
     df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
-    if is_test == 1:
-        df['cost'] += df[nm]/num_loops
     return df
 
-def write_xgb_preds(df, xgb_data, mod, nm, is_test=1):
+def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
     """
-    This writes predictions froma  model into the test data
-    :param df: test observations
-    :return:
+    This writes predictions from an XGBOOST model into the data
+
+    Parameters
+    --------------
+    df: pandas dataframe to predict into
+    xgb_data: XGB dataframe (built from same data as df,
+             with features used by mod)
+    mod: XGB model used for predictions
+    pred_nm: prediction naming convention
+
+    Output
+    --------------
+    data frame with predictions
+
     """
-    # Predict xgb model
+    # Create name for predictions column
+    nm = 'preds'+str(pred_nm)
+    # Predict and rescale (rescales to e^pred - 1)
     df[nm] = mod.predict(xgb_data)
-    # Rescale the prediciton
     df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
-    # IF test create a cost variable represing the avg of loops
+    # Create an average prediction across folds for actual submission
     if is_test == 1:
         df['cost'] += df[nm]/num_loops
     return df

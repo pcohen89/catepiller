@@ -39,14 +39,14 @@ def merge_subms(subm_dict, path, name, target):
 ####################### Run Code #########################
 
 # Merge submissions
-submissions_to_merge = {'1500 trees xgb.csv': .20,
+submissions_to_merge = {'1500 trees xgb.csv': .15,
                         '2500 trees xgb.csv': .1,
-                        '2500 trees xgb w spec vars.csv': .1,
+                        '2500 trees xgb w spec vars.csv': .05,
                         '2500 trees xgb w extra vars.csv': .05,
+                        'stacking with xgboost second stage all vars.csv': .25,
                         'stacking with all vars in forest.csv': .05,
-                        'stacking with three comp.csv': .1,
                         'xgboost from first data build.csv': .05,
-                        'stacking with higher eta.csv': .10,
+                        'stacking with higher eta.csv': .05,
                         'stacking with ridge vars.csv': .05,
                         'cv stack with new vars frst second stage internal 243.csv': .05,
                         'stacking first attempt.csv': .03,
@@ -61,7 +61,8 @@ for key, val in submissions_to_merge.iteritems():
     total_weight += val
 print total_weight
 merge_subms(submissions_to_merge, SUBM_PATH,
-            'blend j.csv', 'cost')
+            'blend k.csv', 'cost')
 
-subm_correl('uhhh neural network.csv',
-            '2500 trees xgb w spec vars.csv', 'id', 'cost')
+subm_correl('stacking with xgboost second stage all vars.csv',
+            'stacking with xgboost second stage.csv', 'id', 'cost')
+
