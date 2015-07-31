@@ -179,7 +179,7 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'4000 trees xgb w spec vars.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees new vars.csv', index=False)
 
 # Code for browsing feature importances
 feats.remove('bend_per_length')

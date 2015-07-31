@@ -252,7 +252,6 @@ def build_vars(df):
     print len(df.columns.values)
     return df
 
-
 ############### Define Globals ########################
 DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
