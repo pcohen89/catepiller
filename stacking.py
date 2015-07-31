@@ -139,7 +139,8 @@ num_loops = 6
 start_num = 12
 # Run (sort of) cross validated models
 for cv_fold in range(start_num, start_num+num_loops):
-    param = {'max_depth': 6, 'eta': .15, 'silent': 1}
+    param = {'max_depth':
+                 6, 'eta': .15, 'silent': 1}
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
     # recode target variable to log(x+1) in trn and val
@@ -196,14 +197,14 @@ for cv_fold in range(start_num, start_num+num_loops):
                 model = model.fit(feat_trn[stage1_feats], feat_trn['target'])
                 # Predict and rescale predictions
                 nm = 'frststage_rdg' + types[i] + types[j] + types[k]
-                val = write_preds(val, model, nm, stage1_feats, is_test=0)
-                mod_trn = write_preds(mod_trn, model, nm, stage1_feats, is_test=0)
-                test = write_preds(test, model, nm, stage1_feats, is_test=0)
+                val = write_preds(val, model, nm, stage1_feats)
+                mod_trn = write_preds(mod_trn, model, nm, stage1_feats)
+                test = write_preds(test, model, nm, stage1_feats)
                 # Store prediction variable name
                 stage2_feats.append('preds'+nm)
                 score_rdg = rmsle(val['cost'], val['preds'+nm])
-                lab = "For the %s - %s - %s fold, score is %s for boost and for forest"
-                print lab % (types[i], types[j], types[k], score)
+                lab = "For the %s - %s - %s fold, score is %s for boost and %s for forest"
+                print lab % (types[i], types[j], types[k], score, score_rdg)
     # Fit second stage model
     model = RandomForestRegressor(n_estimators=2000, n_jobs=8)
     model.fit(mod_trn[stage2_feats], mod_trn.target.values)
@@ -215,16 +216,10 @@ for cv_fold in range(start_num, start_num+num_loops):
     avg_score += score/num_loops
 avg_score
 
-# Fit second stage model
-mod = RandomForestRegressor(n_estimators=400, n_jobs=8)
-mod.fit(mod_trn[stage2_feats], mod_trn.target.values)
-# Write predictions
-val = write_preds(val, mod, cv_fold, stage2_feats, is_test=0)
-test = write_preds(test, mod, cv_fold, stage2_feats, is_test=0)
 
 test['cost'] = test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].mean(axis=1)
 test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'stacking with xgboost second stage all vars.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'threeway vars with forest.csv', index=False)

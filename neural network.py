@@ -91,7 +91,7 @@ feats = [
 'specs_cnt', 'elbow_groove_max', 'other_weight_median', 'other_count',
 'straight_thickness_median', 'sleeve_weight_median', 'nut_weight_median',
 'ext_as_pct', 'comp_weight_sum', 'apprx_density', 'length_x_wall',
-'radius_per_bend', 'bend_per_length','dayofyear'
+'radius_per_bend', 'bend_per_length','dayofyear',
 'reshaped_specs_s_0047', 'reshaped_specs_s_0016', 'reshaped_specs_s_0088',
 'reshaped_specs_s_0065','reshaped_specs_s_0082', 'reshaped_specs_s_0076',
 'tube_end_form_forming_x', 'tube_end_form_forming_y', 'year','month'
@@ -100,46 +100,48 @@ avg_score = 0
 first_loop = 0
 num_loops = 1
 start_num = 12
-# Run (sort of) cross validated models
-for cv_fold in range(start_num, start_num+num_loops):
-    # Create trn val samples
-    trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-    # recode target variable to log(x+1) in trn and val
-    trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
-    val['target'] = val['cost'].apply(lambda x: math.log(x+1))
-    # Separate samples for first stage and second stage
-    model = Sequential()
-    model.add(Dense(len(feats), 256))
-    model.add(Activation('relu'))
-    model.add(Dropout(.2))
-    model.add(Dense(256, 256))
-    model.add(Activation('relu'))
-    model.add(Dropout(.2))
-    model.add(Dense(256, 1))
-    #sgd = SGD(lr=0.15, momentum=.02, nesterov=True)
-    # Rescale data
-    scaler = StandardScaler()
-    scaler.fit(all_data[feats])
-    X = scaler.transform(trn[feats])
-    val_X = scaler.transform(val[feats])
-    test_X = scaler.transform(test[feats])
-    # Fit model
-    model.compile(loss='mse', optimizer='rmsprop')
-    model.fit(X, np.array(trn.target.values), batch_size=32,
-              nb_epoch=45, verbose=2, validation_split=0.15)
-    # Write predictions
-    val['preds_final'] = model.predict(val_X)
-    val['preds_final'] = val['preds_final'].apply(lambda x: math.exp(x)-1)
-    test['cost'] = model.predict(test_X)
-    test['cost'] = test['cost'].apply(lambda x: math.exp(x)-1)
-    # Score loop
-    score = rmsle(val['cost'], val['preds_final'])
-    print "Score for loop %s is: %s" % (cv_fold, score)
-    avg_score += score/num_loops
-avg_score
+for nodes in [450,]:
+    print "nodes: %s" % (nodes)
+    avg_score = 0
+    # Run (sort of) cross validated models
+    for cv_fold in range(start_num, start_num+num_loops):
+        # Create trn val samples
+        trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+        # recode target variable to log(x+1) in trn and val
+        trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
+        val['target'] = val['cost'].apply(lambda x: math.log(x+1))
+        # Separate samples for first stage and second stage
+        model = Sequential()
+        model.add(Dense(len(feats), nodes))
+        model.add(Activation('relu'))
+        model.add(Dropout(.2))
+        model.add(Dense(nodes, 256))
+        model.add(Activation('relu'))
+        model.add(Dropout(.2))
+        model.add(Dense(256, 1))
+        # Rescale data
+        scaler = StandardScaler()
+        scaler.fit(all_data[feats])
+        X = scaler.transform(trn[feats])
+        val_X = scaler.transform(val[feats])
+        test_X = scaler.transform(test[feats])
+        # Fit model
+        model.compile(loss='mse', optimizer='rmsprop')
+        model.fit(X, np.array(trn.target.values), batch_size=32,
+                  nb_epoch=45, verbose=2, validation_split=0.15)
+        # Write predictions
+        val['preds_final'] = model.predict(val_X)
+        val['preds_final'] = val['preds_final'].apply(lambda x: math.exp(x)-1)
+        test['cost'] = model.predict(test_X)
+        test['cost'] = test['cost'].apply(lambda x: math.exp(x)-1)
+        # Score loop
+        score = rmsle(val['cost'], val['preds_final'])
+        print "Score for loop %s is: %s" % (cv_fold, score)
+        avg_score += score/num_loops
+    avg_score
 
 prds = ['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']
-test[].corr()
+test[prds].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))

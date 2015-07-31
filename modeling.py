@@ -154,32 +154,32 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 6, 'eta': .057, 'silent': 1}
-feats.remove('supplier_freq')
+param = {'max_depth': 6, 'eta': .05, 'silent': 1, 'subsample': .8}
 ### Run models
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
     # recode target variable to log(x+1) in trn and val
-    for df in [trn, val]:
-        df['target'] = df['cost'].apply(lambda x: math.log(x+1))
+    trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
+    val['target'] = val['cost'].apply(lambda x: math.log(x+1))
     # Gradient boosting
     xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']))
     xgb_val = xgb.DMatrix(np.array(val[feats]), label=np.array(val['target']))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
     xboost = xgb.train(param.items(), xgb_trn, 2500)
     # Predict and rescale predictions
-    name = 'preds'+str(cv_fold)
+    name = str(cv_fold)
     val = write_xgb_preds(val, xgb_val, xboost, name, is_test=0)
     test = write_xgb_preds(test, xgb_test, xboost, name, is_test=1)
     # Save score
     score = rmsle(val['cost'], val['preds'+str(cv_fold)])
     avg_score += score/num_loops
     print score
+avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees xgb w spec vars.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'4000 trees xgb w spec vars.csv', index=False)
 
 # Code for browsing feature importances
 feats.remove('bend_per_length')
@@ -192,7 +192,7 @@ for cv_fold in range(1, 2):
     # Gradient boosting
     frst = RandomForestRegressor(n_estimators=100, n_jobs=8)
     frst.fit(trn[feats], trn['target'])
-    for i in range(0, len(frst.feature_importances_)):
+    for i in range(400, len(frst.feature_importances_)):
         print "Feature %s has importance: %s" % (feats[i],
                                          frst.feature_importances_[i])
 

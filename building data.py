@@ -10,13 +10,13 @@ def merge_noncomp(df, nm, left_merge, right_merge):
     Merges the non component data sets onto the main training df
     :param df: Main data set we are merging variables onto
     :param nm: name of csv to merge on
-    :param left_merge: left merge variable
-    :param right_merge: right merge variable
+    :param left_merge: (str) left merge variable
+    :param right_merge: (str) right merge variable
     :return: df
     """
     # Read in csv
     merge_df = pd.read_csv(DATA_PATH + nm +'.csv')
-    # Rename columns to format tablename_column_name
+    # Rename columns to format tablename_column_name (if not merge variable)
     columns = merge_df.columns.values
     for col in columns:
         if col != right_merge:
@@ -29,10 +29,15 @@ def merge_noncomp(df, nm, left_merge, right_merge):
 def clean_component_data(comp_dict):
     """
     Reads in and cleans a Caterpiller tube component data sets according to
-    the columns types (numeric, character, binary, etc.) stored in feat_dict
+    the columns types (numeric, character, binary, etc.) stored in feat_list
     Some particular dfs such as adaptor have special cleaning steps
+
+    feat_list : (dict) in format 'name of table' : column 1 type, column 2 type,
+    column 3 type, .....
+
     """
-    for name, feat_dict in comp_dict.iteritems():
+    # Loop through
+    for name, feat_list in comp_dict.iteritems():
         df = pd.read_csv(DATA_PATH + 'comp_' + name + '.csv')
         if name == 'adaptor':
             df_type = pd.read_csv(CLN_PATH + 'type_connection.csv')
@@ -43,9 +48,9 @@ def clean_component_data(comp_dict):
                          'name_x', 'name_y']
             for var in drop_vars:
                 df = df.drop(var, axis=1)
-        for i in range(0, len(feat_dict)):
+        for i in range(0, len(feat_list)):
             # Cleaning steps for categorical or binary variables
-            if ((feat_dict[i]=='cat') | (feat_dict[i]=='bin')):
+            if ((feat_list[i]=='cat') | (feat_list[i]=='bin')):
                 lbl = preprocessing.LabelEncoder()
                 lbl.fit(list(df.ix[:,i]))
                 df.ix[:,i] = lbl.transform(df.ix[:,i])
@@ -211,29 +216,42 @@ def build_vars(df):
     """ This builds some miscellaneous variables that I
     manually determined could be useful for modeling """
     all_cols = df.columns.values
-    weight_cols = []
-    quant_col = []
-    specs_col = []
+    summ_cols = {'weight_median': [], 'materials_quantity': [], 'specs_': [],
+                 'unique': [], 'thick': [], 'orient': [], 'plating': []}
     # Create lists of columns with similar naming conventions
     for col in all_cols:
-        if 'weight_median' in col:
-            weight_cols.append(col)
-        if 'materials_quantity' in col:
-            quant_col.append(col)
-        if 'specs_' in col:
-            specs_col.append(col)
+        for key, val in summ_cols.iteritems():
+            if key in col:
+                val.append(col)
     # Create miscellaenous variables
-    df['comp_weight_sum'] = df[weight_cols].sum(axis=1)
+    df['comp_weight_sum'] = df[summ_cols['weight_median']].sum(axis=1)
     df['apprx_density'] = df.comp_weight_sum/ (df.tube_length + .01)
     df['length_x_wall'] = df.tube_length * df.tube_wall
     df['radius_per_bend'] = df.tube_bend_radius/(df.tube_num_bends + .01)
     df['bend_per_length'] = df.tube_bend_radius/(df.tube_length + .01)
-    df['comp_tot_cnt'] = df[quant_col].sum(axis=1)
-    df['specs_cnt'] = df[specs_col].sum(axis=1)
+    df['ext_over_overall'] = (df.elbow_extension_length_max /
+                                df.elbow_overall_length_max + .01)
+    df['thick_ove_len'] = (df.elbow_thickness_max /
+                                df.elbow_overall_length_max + .01)
+    df['comp_tot_cnt'] = df[summ_cols['materials_quantity']].sum(axis=1)
+    df['specs_cnt'] = df[summ_cols['specs_']].sum(axis=1)
+    df['plate_cnt'] = df[summ_cols['plating']].sum(axis=1)
+    df['unq_cnt'] = df[summ_cols['unique']].sum(axis=1)
+    df['thick_cnt'] = df[summ_cols['thick']].sum(axis=1)
+    df['orient_cnt'] = df[summ_cols['orient']].sum(axis=1)
     df['is_min_order_quantity'] = df['min_order_quantity'] > 0
     df['ext_as_pct'] = df.elbow_extension_length_min/df.elbow_overall_length_min
     df = df.fillna(-1)
+    # Drop variables with no variation
+    print len(df.columns.values)
+    no_variation = ['sleeve_ori', 'sleeve_component_type',
+                    'comp_component_type_id', 'boss_orient', 'nut_orient']
+    for feat in all_cols:
+        if any(x in feat for x in no_variation):
+            df = df.drop(feat, axis=1)
+    print len(df.columns.values)
     return df
+
 
 ############### Define Globals ########################
 DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'
