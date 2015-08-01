@@ -119,12 +119,12 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
     return df
 
 ######################################################
-### Load data ####
+# Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
 non_test = all_data[all_data.is_test == 0]
 test = all_data[all_data.is_test != 0]
 
-### Set hyper parameters of process
+# Set hyper parameters of process
 types = ['boss', 'adaptor', 'elbow', 'float', 'hfl', 'nut', 'other', 'sleeve',
          'straight', 'threaded']
 all_feats = all_data.columns.values
@@ -132,9 +132,9 @@ avg_score = 0
 first_loop = 0
 num_loops = 6
 start_num = 12
-# Run (sort of) cross validated models
+# Run bagged models
 for cv_fold in range(start_num, start_num+num_loops):
-    param = {'max_depth':6, 'eta': .14, 'silent': 1, 'subsample': .7}
+    param = {'max_depth': 6, 'eta': .14, 'silent': 1, 'subsample': .7}
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
     # recode target variable to log(x+1) in trn and val
@@ -167,6 +167,7 @@ for cv_fold in range(start_num, start_num+num_loops):
                                 'is_min_order_quantity', 'ext_as_pct'
                 ]
                 # Add all feats that match either component type
+                # Note: see data building for how shorten this if statement
                 for feat in all_feats:
                     if ((types[j] in feat) | (types[i] in feat) | (types[k] in feat)):
                         stage1_feats.append(feat)
