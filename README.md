@@ -1,4 +1,4 @@
-# Caterpiller
+# Caterpiller (spelled correctly, unlike the repo)
 
 ## Different ideas for how to handle the data
 
@@ -33,7 +33,7 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] bends/length
 - [x] Flag if end_a != end_x
 - [x] Number of bends per bend radius (does this even make sense?)
-- [ ] Unique or rare part should be interacted with quantity maybe?
+- [ ] Unique or rare part should be interacted with quantity
 - [x] maybe sum the number of tube assemblies associated with the supplier
 
 ## Modeling approaches
