@@ -35,6 +35,7 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Number of bends per bend radius (does this even make sense?)
 - [ ] Unique or rare part should be interacted with quantity
 - [x] maybe sum the number of tube assemblies associated with the supplier
+- [ ] Identify if any tubes are exactly similar to any others (or use some measure of similarity, or use knn)
 
 ## Modeling approaches
 - [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
