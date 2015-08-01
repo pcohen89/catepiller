@@ -24,6 +24,7 @@ In this case, the data will have a feature for each component. The feature will 
 
 - [x] Model with current data structure and include units as a field
 - [x] Somehow account for the fact that some tube assmblies have 4-7 observations associated with them
+- [ ] Use 1/16th power rather than the 1 + log
 
 ### 4. Misc data ideas
 - [x] Sum weight from all components
@@ -39,10 +40,11 @@ In this case, the data will have a feature for each component. The feature will 
 
 ## Modeling approaches
 - [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
-- [x] Gradient with stumps
+- [x] Gradient with stumps (this seems to be dominated by meduim depth trees)
 - [x] Svm (small data means this might work okay)
 - [x] penalized regression
 - [x] NN (sigh, finding a reasonable specification has been a nightmare)
+- [ ] KNN (this might actually be a reasonable application for it, remember to normalize first)
 - [x] Try to get XGBOOST running
 - [x] Two stage stacking approach (first stage you create predictions for bunch of model using only two components at a time, second state you fite a ridge to all varaibles plus first stage predictions)
 
