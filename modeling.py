@@ -132,7 +132,8 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
     nm = 'preds'+str(pred_nm)
     # Predict and rescale (rescales to e^pred - 1)
     df[nm] = mod.predict(xgb_data)
-    df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    #df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    df[nm] = np.power(df[nm], 16)
     # Create an average prediction across folds for actual submission
     if is_test == 1:
         df['cost'] += df[nm]/num_loops
@@ -161,8 +162,10 @@ for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
     # recode target variable to log(x+1) in trn and val
-    trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
-    val['target'] = val['cost'].apply(lambda x: math.log(x+1))
+    #trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
+    #val['target'] = val['cost'].apply(lambda x: math.log(x+1))
+    trn['target'] = np.power(trn['cost'], .0625)
+    val['target'] = np.power(val['cost'], .0625)
     # Gradient boosting
     xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']))
     xgb_val = xgb.DMatrix(np.array(val[feats]), label=np.array(val['target']))
@@ -225,6 +228,17 @@ for num_n in [ 8,]:
     # Save score
     score = rmsle(val['cost'], val['preds'])
     print "Score for %s is %s " % (num_n, score)
+
+
+trn, val = create_val_and_train(non_test, 1, 'tube_assembly_id', .2)
+trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
+val['target'] = val['cost'].apply(lambda x: math.log(x+1))
+rdg = RandomForestRegressor(n_estimators=1000, n_jobs=8)
+rdg.fit(trn[feats], trn.target)
+val['preds'] = rdg.predict(val[feats])
+val['preds'] = val['preds'].apply(lambda x: math.exp(x)-1)
+score = rmsle(val['cost'], val['preds'])
+print "Score for %s is %s " % (num_n, score)
 
 
 # Export test preds
