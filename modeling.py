@@ -138,25 +138,25 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
         df['cost'] += df[nm]/num_loops
     return df
 
-######################################################
-### Load data ####
+############### Run Code ######################
+# Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
 non_test = all_data[all_data.is_test == 0]
 test = all_data[all_data.is_test != 0]
 
-### Create list of features
+# Create list of features
 feats = list(all_data.columns.values)
 non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
 for var in non_feats:
     feats.remove(var)
 
-### Set parameters
+# Set parameters
 avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
 param = {'max_depth': 6, 'eta': .05, 'silent': 1, 'subsample': .8}
-### Run models
+# Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
@@ -169,9 +169,8 @@ for cv_fold in range(start_num, start_num+num_loops):
     xgb_test = xgb.DMatrix(np.array(test[feats]))
     xboost = xgb.train(param.items(), xgb_trn, 2500)
     # Predict and rescale predictions
-    name = str(cv_fold)
-    val = write_xgb_preds(val, xgb_val, xboost, name, is_test=0)
-    test = write_xgb_preds(test, xgb_test, xboost, name, is_test=1)
+    val = write_xgb_preds(val, xgb_val, xboost, str(cv_fold), is_test=0)
+    test = write_xgb_preds(test, xgb_test, xboost, str(cv_fold), is_test=1)
     # Save score
     score = rmsle(val['cost'], val['preds'+str(cv_fold)])
     avg_score += score/num_loops
