@@ -223,4 +223,4 @@ test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'threeway vars with forest.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'threeway vars with subsamp.csv', index=False)

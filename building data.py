@@ -185,12 +185,16 @@ def clean_merged_df(df):
     df['month'] = df.quote_date.apply(lambda x: x[5:7])
     df['dayofyear'] = df.quote_date.apply(lambda x: x[8:10])
     # Create list of categorical and numeric vars
-    num_cols = df._get_numeric_data().columns.values
+    col_types = df.dtypes.reset_index()
+    num_col_rows = col_types[col_types[0] != 'object']
+    num_cols = list(num_col_rows['index'])
+    print num_cols
     for col in num_cols:
         mean = df[col].mean()
         df[col] = df[col].fillna(value=mean)
     # Treat non numeric cols as categoricals
     cat_cols = list(set(cols)-set(num_cols)-set(['tube_assembly_id',]))
+    print cat_cols
     # Encode categoricals as numerics
     for col in cat_cols:
         # Fill column missings with -1
@@ -198,6 +202,33 @@ def clean_merged_df(df):
         lbl = preprocessing.LabelEncoder()
         lbl.fit(list(df[col]))
         df[col] = lbl.transform(df.ix[:,col])
+    return df
+
+def make_onehot_data(df, cat_cols, freq_thresh=.004):
+    """
+    This adds dummies to a data frame to represent a categorical variable
+    as a set of dummy variables
+
+    :param df: dataframe to encode one hot variables into
+    :param cols: (dict) key - column in df to onehot encode, value - naming
+    convention for the dummies
+    :param freq_thresh: threshold for % of time a dummy needs to be 1 to be
+    included
+    :return: df with dummies
+    """
+    # loop through columns and nameing conventions
+    for col, name in cat_cols.iteritems():
+        # Create all dummies for column of interest
+        onehot = pd.get_dummies(df[col], prefix=name)
+        # Calc means of dummiers
+        means = onehot.mean().reset_index()
+        # Drop dummies that appear infrequently
+        means = means[means[0]> freq_thresh]
+        cols_to_keep = list(means['index'])
+        onehot = onehot[cols_to_keep]
+        # Append columnwise
+        df = pd.concat([df, onehot], axis=1)
+        df.drop(col, axis=1)
     return df
 
 def add_supp_var(df):
@@ -330,6 +361,17 @@ for tube_end in ['a', 'x']:
                              "tube_end_" + tube_end, "end_form_id")
 # Rename data after adding datasets
 all_data_wtubeend = all_data
+all_data_onehot = pd.DataFrame(all_data)
+# Create a small oneHot data set (old pandas has a much less capable
+#  get_dummies
+columns_for_onehot = {'tube_material_id': 'tube_mat',
+                      'bill_of_materials_component_id_1' : 'comp1',
+                      'bill_of_materials_component_id_2' : 'comp2',
+                      'bill_of_materials_component_id_3' : 'comp3',
+                      'bill_of_materials_component_id_4' : 'comp4'
+                     }
+all_data_onehot = make_onehot_data(all_data_onehot, columns_for_onehot)
+cleaned_all_data_onehot = clean_merged_df(all_data_onehot)
 # Iteratively merge on each component data set
 for name, field_dict in comp_dict.iteritems():
     all_data_wtubeend = add_component_vars(all_data_wtubeend, name, field_dict)

@@ -3,13 +3,14 @@ __author__ = 'p_cohen'
 ############## Import packages ########################
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.linear_model import Lasso
 import numpy as np
 import math
 import sys
 sys.path.append('/home/vagrant/xgboost/wrapper')
 import xgboost as xgb
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsRegressor
 
 ############### Define Globals ########################
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
@@ -195,4 +196,39 @@ for cv_fold in range(1, 2):
     for i in range(400, len(frst.feature_importances_)):
         print "Feature %s has importance: %s" % (feats[i],
                                          frst.feature_importances_[i])
+
+
+
+### Create list of features
+feats = list(all_data_onehot.columns.values)
+non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
+for var in non_feats:
+    feats.remove(var)
+
+# Create knn predictions using onehot data
+non_test = cleaned_all_data_onehot[cleaned_all_data_onehot.is_test == 0]
+test = cleaned_all_data_onehot[cleaned_all_data_onehot.is_test != 0]
+scaler = StandardScaler()
+scaler.fit(cleaned_all_data_onehot[feats])
+trn, val = create_val_and_train(non_test, 1, 'tube_assembly_id', .2)
+trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
+val['target'] = val['cost'].apply(lambda x: math.log(x+1))
+X_trn = scaler.transform(trn[feats])
+X_val = scaler.transform(val[feats])
+X_test = scaler.transform(test[feats])
+for num_n in [ 8,]:
+    mod = KNeighborsRegressor(n_neighbors=num_n)
+    mod.fit(X_trn, trn.target)
+    val['preds'] = mod.predict(X_val)
+    val['preds'] = val['preds'].apply(lambda x: math.exp(x)-1)
+    test['cost'] = mod.predict(X_test)
+    test['cost'] = test['cost'].apply(lambda x: math.exp(x)-1)
+    # Save score
+    score = rmsle(val['cost'], val['preds'])
+    print "Score for %s is %s " % (num_n, score)
+
+
+# Export test preds
+test['id'] = test['id'].apply(lambda x: int(x))
+test[['id', 'cost']].to_csv(SUBM_PATH+'knn.csv', index=False)
 

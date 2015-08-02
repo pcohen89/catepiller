@@ -96,6 +96,7 @@ feats = [
 'reshaped_specs_s_0065','reshaped_specs_s_0082', 'reshaped_specs_s_0076',
 'tube_end_form_forming_x', 'tube_end_form_forming_y', 'year','month'
 ]
+
 avg_score = 0
 first_loop = 0
 num_loops = 1
@@ -112,13 +113,14 @@ for nodes in [450,]:
         val['target'] = val['cost'].apply(lambda x: math.log(x+1))
         # Separate samples for first stage and second stage
         model = Sequential()
+        model.add(Dropout(.4))
         model.add(Dense(len(feats), nodes))
         model.add(Activation('relu'))
         model.add(Dropout(.2))
-        model.add(Dense(nodes, 256))
+        model.add(Dense(nodes, 100))
         model.add(Activation('relu'))
         model.add(Dropout(.2))
-        model.add(Dense(256, 1))
+        model.add(Dense(100, 1))
         # Rescale data
         scaler = StandardScaler()
         scaler.fit(all_data[feats])
