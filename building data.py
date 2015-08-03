@@ -149,6 +149,69 @@ def aggregate_compslots(df, comp, comp_var_list):
         df = df.drop(var_list, axis=1)
     return df
 
+def gen_num_comp_type(bill_path, comp_path, cln_path):
+    """
+    This file extracts information from component files differently than
+    previous attempts
+
+    :param bill_path: path to bill of materials
+    :param comp_path: path to component files
+    :param cln_path: path to output dataframe
+    :return: dataframe with tube assembly ids and new variables
+    """
+    bill = pd.read_csv(bill_path)
+    types = ['boss', 'adaptor', 'elbow', 'float', 'hfl', 'nut',
+             'other', 'sleeve', 'straight', 'tee', 'threaded']
+    # Store new column names
+    new_cols = ['adjusted_wt', 'adjusted_unique_cnt']
+    for type in types:
+        new_cols.append(type+'_cnt')
+    # Initialize new columns
+    for col in new_cols:
+        bill[col] = 0
+    # Store original column names
+    cols_to_keep = bill.columns.values
+    # Store the stemmed merge variable
+    merge_id = 'component_id'
+    # Recode NA to zero in bill of materials
+    for slot in range(1, 9):
+        quant = 'quantity_' + str(slot)
+        comp_id = 'component_id_' + str(slot)
+        bill[quant] = bill[quant].fillna(value=0)
+        bill[comp_id] = bill[comp_id].fillna(value=0)
+    # Analyze each component type
+    for comp in types:
+        comp_df = pd.read_csv(comp_path+'comp_'+comp+".csv")
+        comp_df['is_merged'] = 1
+        comp_df.ix[comp_df.weight.isnull(), 'weight'] = 0
+        if 'unique_feature' not in comp_df:
+            comp_df['unique_feature'] = 'No'
+        comp_df['unique_feature'] = comp_df['unique_feature'] == 'Yes'
+        print comp_df.unique_feature
+        # Loop over bill slots
+        for slot in range(1, 9):
+            # Merge component on to a single slot
+            bill = bill.merge(comp_df, how="left",
+                              left_on=merge_id + '_' +str(slot),
+                              right_on=merge_id)
+            # code is_merged as zero if record didn't merge
+            bill.ix[bill.is_merged.isnull(), 'is_merged'] = 0
+            bill.ix[bill.weight.isnull(), 'weight'] = 0
+            bill.ix[bill.unique_feature.isnull(), 'unique_feature'] = 0
+            # Increment the number of pieces for the component
+            bill[comp+'_cnt'] += bill.is_merged * bill['quantity_'+str(slot)]
+            bill['adjusted_wt'] += (bill.is_merged *
+                                    bill['quantity_'+str(slot)] * bill.weight)
+            bill['adjusted_unique_cnt'] += (bill.is_merged *
+                                            bill['quantity_'+str(slot)] *
+                                            bill.unique_feature)
+            # Drop component specific vars
+            bill = bill.ix[:, cols_to_keep]
+    new_cols.append('tube_assembly_id')
+    return bill[new_cols]
+
+bill = gen_num_comp_type(DATA_PATH+'bill_of_materials.csv', DATA_PATH, CLN_PATH)
+
 def add_component_vars(df, comp, comp_var_list):
     """
     This merges a comp_* table onto bill_of_materials and takes aggregated

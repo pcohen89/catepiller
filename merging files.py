@@ -42,9 +42,9 @@ def merge_subms(subm_dict, path, name, target):
 
 # Merge submissions
 subs_to_merge = {
-    '4000 trees xgb w spec vars.csv': .15,
-    '4000 trees power no log.csv': .15,
-    '2500 trees new vars.csv': .14,
+    '4000 trees power bill vars.csv': .29,
+    '4000 trees power no log.csv': .05,
+    '2500 trees power bill vars.csv': .10,
     'threeway vars with subsamp.csv': .41,
     'threeway vars with forest.csv': .01,
     '1500 trees xgb.csv': .01,
@@ -67,8 +67,8 @@ total_weight = 0
 for key, val in subs_to_merge.iteritems():
     total_weight += val
 print "The total weight should be 1.0, it is: %s" % (total_weight)
-merge_subms(subs_to_merge, SUBM_PATH, 'blend p.csv', 'cost')
+merge_subms(subs_to_merge, SUBM_PATH, 'blend q.csv', 'cost')
 
 subm_correl('blend p.csv',
-            'blend o.csv', 'id', 'cost')
+            'blend q.csv', 'id', 'cost')
 

@@ -121,6 +121,9 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
 ######################################################
 # Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
+### TEMP CODE
+all_data = all_data.merge(bill, on='tube_assembly_id')
+###########
 non_test = all_data[all_data.is_test == 0]
 test = all_data[all_data.is_test != 0]
 
@@ -162,8 +165,10 @@ for cv_fold in range(start_num, start_num+num_loops):
                                 'tube_end_x_1x', 'tube_end_x_2x', 'tube_end_a',
                                 'tube_end_x', 'tube_num_boss',
                                 'tube_num_bracket', 'tube_other',
-                                'year', 'month', 'dayofyear', 'comp_weight_sum',
-                                'comp_tot_cnt', 'specs_cnt',
+                                'adjusted_unique_cnt',
+                                'year', 'month', 'dayofyear',
+                                'comp_weight_sum',
+                                'comp_tot_cnt', 'specs_cnt', 'adjusted_wt',
                                 'is_min_order_quantity', 'ext_as_pct'
                 ]
                 # Add all feats that match either component type
@@ -205,8 +210,8 @@ for cv_fold in range(start_num, start_num+num_loops):
                 # Report score of loop
                 label1 = "For the %s - %s - %s fold, score"
                 label2 = "is %s for boost and %s for forest"
-                print label1 + label2 % (types[i], types[j],
-                                         types[k], score, score_rdg)
+                label = label1 + " " + label2
+                print label % (types[i], types[j], types[k], score, score_rdg)
     # Fit second stage model
     model = RandomForestRegressor(n_estimators=2000, n_jobs=8)
     model.fit(mod_trn[stage2_feats], mod_trn.target.values)

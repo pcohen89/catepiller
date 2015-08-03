@@ -142,6 +142,9 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
 ############### Run Code ######################
 # Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
+### TEMP CODE
+all_data = all_data.merge(bill, on='tube_assembly_id')
+###########
 non_test = all_data[all_data.is_test == 0]
 test = all_data[all_data.is_test != 0]
 
@@ -156,7 +159,7 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 6, 'eta': .03, 'silent': 1, 'subsample': .8}
+param = {'max_depth': 6, 'eta': .05, 'silent': 1, 'subsample': .8}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -170,7 +173,7 @@ for cv_fold in range(start_num, start_num+num_loops):
     xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']))
     xgb_val = xgb.DMatrix(np.array(val[feats]), label=np.array(val['target']))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost = xgb.train(param.items(), xgb_trn, 4000)
+    xboost = xgb.train(param.items(), xgb_trn, 2500)
     # Predict and rescale predictions
     val = write_xgb_preds(val, xgb_val, xboost, str(cv_fold), is_test=0)
     test = write_xgb_preds(test, xgb_test, xboost, str(cv_fold), is_test=1)
@@ -182,10 +185,9 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'4000 trees power no log.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees power bill vars.csv', index=False)
 
 # Code for browsing feature importances
-feats.remove('bend_per_length')
 for cv_fold in range(1, 2):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
@@ -195,11 +197,9 @@ for cv_fold in range(1, 2):
     # Gradient boosting
     frst = RandomForestRegressor(n_estimators=100, n_jobs=8)
     frst.fit(trn[feats], trn['target'])
-    for i in range(400, len(frst.feature_importances_)):
-        print "Feature %s has importance: %s" % (feats[i],
-                                         frst.feature_importances_[i])
-
-
+    outputs = pd.DataFrame({'feats': feats,
+                           'weight': frst.feature_importances_})
+    print outputs.sort(columns='weight', ascending=False)
 
 ### Create list of features
 feats = list(all_data_onehot.columns.values)
