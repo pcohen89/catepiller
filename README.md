@@ -24,7 +24,7 @@ In this case, the data will have a feature for each component. The feature will 
 
 - [x] Model with current data structure and include units as a field
 - [x] Somehow account for the fact that some tube assmblies have 4-7 observations associated with them
-- [ ] Use 1/16th power rather than the 1 + log
+- [x] Use 1/16th power rather than the 1 + log
 
 ### 4. Misc data ideas
 - [x] Sum weight from all components
@@ -35,6 +35,7 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Flag if end_a != end_x
 - [x] Number of bends per bend radius (does this even make sense?)
 - [ ] Unique or rare part should be interacted with quantity
+- [ ] Analyze bill of materials quantity more, somehow I need to capture that if a given component is adding a lot of cost, than the quantity of that component is really important
 - [x] maybe sum the number of tube assemblies associated with the supplier
 - [ ] Identify if any tubes are exactly similar to any others (or use some measure of similarity, or use knn)
 
