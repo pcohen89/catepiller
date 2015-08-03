@@ -1,8 +1,7 @@
 __author__ = 'p_cohen'
 
 import pandas as pd
-import math
-from sklearn import ensemble, preprocessing
+from sklearn import preprocessing
 
 ############### Define Functions ########################
 def merge_noncomp(df, nm, left_merge, right_merge):
@@ -141,7 +140,7 @@ def aggregate_compslots(df, comp, comp_var_list):
         # use dictionary to check if column is numeric
         if ((comp_var_list[i] == 'num') or (comp_var_list[i] == 'bin')):
             # Aggregate list
-            df[base_nm+"_median"] = df[var_list].mean(axis=1)
+            df[base_nm+"_median"] = df[var_list].median(axis=1)
         if comp_var_list[i] != 'id':
             # Store max and min values of variable across types
             df[base_nm+"_max"] = df[var_list].max(axis=1)
@@ -365,10 +364,10 @@ all_data_onehot = pd.DataFrame(all_data)
 # Create a small oneHot data set (old pandas has a much less capable
 #  get_dummies
 columns_for_onehot = {'tube_material_id': 'tube_mat',
-                      'bill_of_materials_component_id_1' : 'comp1',
-                      'bill_of_materials_component_id_2' : 'comp2',
-                      'bill_of_materials_component_id_3' : 'comp3',
-                      'bill_of_materials_component_id_4' : 'comp4'
+                      'bill_of_materials_component_id_1': 'comp1',
+                      'bill_of_materials_component_id_2': 'comp2',
+                      'bill_of_materials_component_id_3': 'comp3',
+                      'bill_of_materials_component_id_4': 'comp4'
                      }
 all_data_onehot = make_onehot_data(all_data_onehot, columns_for_onehot)
 cleaned_all_data_onehot = clean_merged_df(all_data_onehot)

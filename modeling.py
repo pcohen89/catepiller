@@ -156,7 +156,7 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 6, 'eta': .05, 'silent': 1, 'subsample': .8}
+param = {'max_depth': 6, 'eta': .03, 'silent': 1, 'subsample': .8}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -170,7 +170,7 @@ for cv_fold in range(start_num, start_num+num_loops):
     xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']))
     xgb_val = xgb.DMatrix(np.array(val[feats]), label=np.array(val['target']))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost = xgb.train(param.items(), xgb_trn, 2500)
+    xboost = xgb.train(param.items(), xgb_trn, 4000)
     # Predict and rescale predictions
     val = write_xgb_preds(val, xgb_val, xboost, str(cv_fold), is_test=0)
     test = write_xgb_preds(test, xgb_test, xboost, str(cv_fold), is_test=1)
@@ -182,7 +182,7 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees new vars.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'4000 trees power no log.csv', index=False)
 
 # Code for browsing feature importances
 feats.remove('bend_per_length')
