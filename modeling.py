@@ -143,6 +143,12 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
 # Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
 non_test = all_data[all_data.is_test == 0]
+unique_tube = 1
+if unique_tube == 1:
+    grouped = non_test.groupby('tube_assembly_id')
+    tube_maxquant = grouped.quantity.max().reset_index()
+    mrg_vars = ['tube_assembly_id', 'quantity']
+    non_test = non_test.merge(tube_maxquant, how='inner', on=mrg_vars)
 test = all_data[all_data.is_test != 0]
 
 # Create list of features
