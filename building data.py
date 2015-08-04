@@ -166,7 +166,8 @@ def gen_bill_vars(bill_path, comp_path, cln_path):
     types = ['boss', 'adaptor', 'elbow', 'float', 'hfl', 'nut',
              'other', 'sleeve', 'straight', 'tee', 'threaded']
     # Store new column names
-    new_cols = ['adjusted_wt', 'adjusted_unique_cnt']
+    new_cols = ['adjusted_wt', 'adjusted_unique_cnt', 'overall_len_sum',
+                'groove_cnt', 'thickness_sum', 'plating_cnt']
     for type in types:
         new_cols.append(type+'_cnt')
     # Initialize new columns
@@ -190,10 +191,17 @@ def gen_bill_vars(bill_path, comp_path, cln_path):
         comp_df['is_merged'] = 1
         # code nulls to zero
         comp_df.ix[comp_df.weight.isnull(), 'weight'] = 0
-        # Code unique feature to boolean
-        if 'unique_feature' not in comp_df:
-            comp_df['unique_feature'] = 'No'
-        comp_df['unique_feature'] = comp_df['unique_feature'] == 'Yes'
+        # Code feature to boolean, make sure they exist
+        vars_to_create_no = ['unique_feature', 'groove', 'plating']
+        for var in vars_to_create_no:
+            if var not in comp_df:
+                comp_df[var] = 'No'
+            comp_df[var] = comp_df[var] == 'Yes'
+        # Code overall length to zero if missing
+        vars_to_create_zero = ['overall_length', 'thickness']
+        for var in vars_to_create_zero:
+            if var not in comp_df:
+                comp_df[var] = 0
         # Loop over bill slots
         for slot in range(1, 9):
             # Merge component on to a single slot
@@ -201,17 +209,17 @@ def gen_bill_vars(bill_path, comp_path, cln_path):
                               left_on=merge_id + '_' +str(slot),
                               right_on=merge_id)
             # code is_merged as zero if record didn't merge
-            bill.ix[bill.is_merged.isnull(), 'is_merged'] = 0
-            bill.ix[bill.weight.isnull(), 'weight'] = 0
-            bill.ix[bill.unique_feature.isnull(), 'unique_feature'] = 0
+            zero_vars = ['is_merged', 'weight', 'unique_feature',
+                         'overall_length', 'groove', 'plating']
+            for zero_var in zero_vars:
+                bill.ix[bill[zero_var].isnull(), zero_var] = 0
             # Increment the number of pieces for the component
-            bill[comp+'_cnt'] += bill.is_merged * bill['quantity_'+str(slot)]
-            bill['adjusted_wt'] += (bill.is_merged *
-                                    bill['quantity_'+str(slot)] *
-                                    bill.weight)
-            bill['adjusted_unique_cnt'] += (bill.is_merged *
-                                            bill['quantity_'+str(slot)] *
-                                            bill.unique_feature)
+            quant_mergd = bill.is_merged * bill['quantity_'+str(slot)]
+            bill[comp+'_cnt'] += quant_mergd
+            bill['adjusted_wt'] += (quant_mergd * bill.weight)
+            bill['adjusted_unique_cnt'] += (quant_mergd * bill.unique_feature)
+            bill['overall_len_sum'] += (quant_mergd * bill.overall_length)
+            bill['groove_cnt'] += (quant_mergd * bill.groove)
             # Drop component specific vars
             bill = bill.ix[:, cols_to_keep]
     new_cols.append('tube_assembly_id')

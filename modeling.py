@@ -1,4 +1,4 @@
-__author__ = 'p_cohen'
+#__author__ = 'p_cohen'
 
 ############## Import packages ########################
 import pandas as pd
@@ -17,7 +17,7 @@ CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
 SUBM_PATH = '/home/vagrant/caterpillar-peter/Submissions/'
 
 ############### Define Functions ########################
-def create_val_and_train(df, seed, ids, split_rt = .20):
+def create_val_and_train(df, seed, ids, split_rt=.20):
     """
         Creates two samples (generally used to create
         train and validation samples)
