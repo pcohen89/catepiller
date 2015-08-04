@@ -70,6 +70,6 @@ for key, val in subs_to_merge.iteritems():
 print "The total weight should be 1.0, it is: %s" % (total_weight)
 merge_subms(subs_to_merge, SUBM_PATH, 'blend r.csv', 'cost')
 
-subm_correl('blend r.csv',
-            'blend q.csv', 'id', 'cost')
+subm_correl('4000 trees power bill vars.csv',
+            '4000 trees power no log.csv', 'id', 'cost')
 

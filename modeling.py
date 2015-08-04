@@ -156,7 +156,7 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 6, 'eta': .05, 'silent': 1, 'subsample': .8}
+param = {'max_depth': 8, 'eta': .028, 'silent': 1, 'subsample': .8}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -170,7 +170,7 @@ for cv_fold in range(start_num, start_num+num_loops):
     xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']))
     xgb_val = xgb.DMatrix(np.array(val[feats]), label=np.array(val['target']))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost = xgb.train(param.items(), xgb_trn, 2500)
+    xboost = xgb.train(param.items(), xgb_trn, 4000)
     # Predict and rescale predictions
     val = write_xgb_preds(val, xgb_val, xboost, str(cv_fold), is_test=0)
     test = write_xgb_preds(test, xgb_test, xboost, str(cv_fold), is_test=1)
@@ -182,7 +182,8 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees power bill vars.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'4000 trees power bill vars 2nd set depth 8.csv', index=False)
+
 
 # Code for browsing feature importances
 for cv_fold in range(1, 2):
@@ -197,48 +198,3 @@ for cv_fold in range(1, 2):
     outputs = pd.DataFrame({'feats': feats,
                            'weight': frst.feature_importances_})
     print outputs.sort(columns='weight', ascending=False)
-
-### Create list of features
-feats = list(all_data_onehot.columns.values)
-non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
-for var in non_feats:
-    feats.remove(var)
-
-# Create knn predictions using onehot data
-non_test = cleaned_all_data_onehot[cleaned_all_data_onehot.is_test == 0]
-test = cleaned_all_data_onehot[cleaned_all_data_onehot.is_test != 0]
-scaler = StandardScaler()
-scaler.fit(cleaned_all_data_onehot[feats])
-trn, val = create_val_and_train(non_test, 1, 'tube_assembly_id', .2)
-trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
-val['target'] = val['cost'].apply(lambda x: math.log(x+1))
-X_trn = scaler.transform(trn[feats])
-X_val = scaler.transform(val[feats])
-X_test = scaler.transform(test[feats])
-for num_n in [ 8,]:
-    mod = KNeighborsRegressor(n_neighbors=num_n)
-    mod.fit(X_trn, trn.target)
-    val['preds'] = mod.predict(X_val)
-    val['preds'] = val['preds'].apply(lambda x: math.exp(x)-1)
-    test['cost'] = mod.predict(X_test)
-    test['cost'] = test['cost'].apply(lambda x: math.exp(x)-1)
-    # Save score
-    score = rmsle(val['cost'], val['preds'])
-    print "Score for %s is %s " % (num_n, score)
-
-
-trn, val = create_val_and_train(non_test, 1, 'tube_assembly_id', .2)
-trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
-val['target'] = val['cost'].apply(lambda x: math.log(x+1))
-rdg = RandomForestRegressor(n_estimators=1000, n_jobs=8)
-rdg.fit(trn[feats], trn.target)
-val['preds'] = rdg.predict(val[feats])
-val['preds'] = val['preds'].apply(lambda x: math.exp(x)-1)
-score = rmsle(val['cost'], val['preds'])
-print "Score for %s is %s " % (num_n, score)
-
-
-# Export test preds
-test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'knn.csv', index=False)
-

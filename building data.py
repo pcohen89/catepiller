@@ -3,6 +3,7 @@ __author__ = 'p_cohen'
 import pandas as pd
 from sklearn import preprocessing
 import numpy as np
+from datetime import datetime
 
 ############### Define Functions ########################
 def merge_noncomp(df, nm, left_merge, right_merge):
@@ -210,16 +211,19 @@ def gen_bill_vars(bill_path, comp_path, cln_path):
                               right_on=merge_id)
             # code is_merged as zero if record didn't merge
             zero_vars = ['is_merged', 'weight', 'unique_feature',
-                         'overall_length', 'groove', 'plating']
+                         'overall_length', 'groove', 'plating', 'thickness']
             for zero_var in zero_vars:
                 bill.ix[bill[zero_var].isnull(), zero_var] = 0
             # Increment the number of pieces for the component
             quant_mergd = bill.is_merged * bill['quantity_'+str(slot)]
             bill[comp+'_cnt'] += quant_mergd
-            bill['adjusted_wt'] += (quant_mergd * bill.weight)
-            bill['adjusted_unique_cnt'] += (quant_mergd * bill.unique_feature)
-            bill['overall_len_sum'] += (quant_mergd * bill.overall_length)
-            bill['groove_cnt'] += (quant_mergd * bill.groove)
+            new_features = {
+                'adjusted_wt': 'weight', 'groove_cnt': 'groove', 'plating_cnt':
+                'plating', 'adjusted_unique_cnt': 'unique_feature',
+                'overall_len_sum': 'overall_length', 'thickness_sum': 'thickness'
+             }
+            for new_name, base_var in new_features.iteritems():
+                bill[new_name] += (quant_mergd * bill[base_var])
             # Drop component specific vars
             bill = bill.ix[:, cols_to_keep]
     new_cols.append('tube_assembly_id')
@@ -291,11 +295,16 @@ def clean_merged_df(df):
     df['year'] = df.quote_date.apply(lambda x: x[0:4])
     df['month'] = df.quote_date.apply(lambda x: x[5:7])
     df['dayofyear'] = df.quote_date.apply(lambda x: x[8:10])
+    df['dayofweek'] = df.quote_date.apply(
+        lambda x: datetime.strptime(x, "%Y-%m-%d").weekday()
+    )
     # Create list of categorical and numeric vars
     col_types = df.dtypes.reset_index()
     num_col_rows = col_types[col_types[0] != 'object']
     num_cols = list(num_col_rows['index'])
     for col in num_cols:
+        if col == 'quote_date':
+            continue
         mean = df[col].mean()
         df[col] = df[col].fillna(value=mean)
     # Treat non numeric cols as categoricals

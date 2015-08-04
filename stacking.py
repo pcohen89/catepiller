@@ -87,7 +87,7 @@ def write_preds(df, mod, name, features):
     """
     nm = 'preds'+str(name)
     df[nm] = mod.predict(df[features])
-    df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    df[nm] = np.power(df[nm], 16)
     return df
 
 
@@ -112,7 +112,7 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
     nm = 'preds'+str(pred_nm)
     # Predict and rescale (rescales to e^pred - 1)
     df[nm] = mod.predict(xgb_data)
-    df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    df[nm] = np.power(df[nm], 16)
     # Create an average prediction across folds for actual submission
     if is_test == 1:
         df['cost'] += df[nm]/num_loops
@@ -138,8 +138,8 @@ for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
     # recode target variable to log(x+1) in trn and val
-    for df in [trn, val]:
-        df['target'] = df['cost'].apply(lambda x: math.log(x+1))
+    trn['target'] = np.power(trn['cost'], .0625)
+    val['target'] = np.power(val['cost'], .0625)
     # Separate samples for first stage and second stage
     feat_trn, mod_trn = create_val_and_train(trn, cv_fold, 'tube_assembly_id', .15)
     # Create list of second stage modeling features
