@@ -142,9 +142,6 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
 ############### Run Code ######################
 # Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
-### TEMP CODE
-all_data = all_data.merge(bill, on='tube_assembly_id')
-###########
 non_test = all_data[all_data.is_test == 0]
 test = all_data[all_data.is_test != 0]
 

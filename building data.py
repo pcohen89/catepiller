@@ -2,6 +2,7 @@ __author__ = 'p_cohen'
 
 import pandas as pd
 from sklearn import preprocessing
+import numpy as np
 
 ############### Define Functions ########################
 def merge_noncomp(df, nm, left_merge, right_merge):
@@ -149,7 +150,7 @@ def aggregate_compslots(df, comp, comp_var_list):
         df = df.drop(var_list, axis=1)
     return df
 
-def gen_num_comp_type(bill_path, comp_path, cln_path):
+def gen_bill_vars(bill_path, comp_path, cln_path):
     """
     This file extracts information from component files differently than
     previous attempts
@@ -160,6 +161,8 @@ def gen_num_comp_type(bill_path, comp_path, cln_path):
     :return: dataframe with tube assembly ids and new variables
     """
     bill = pd.read_csv(bill_path)
+    # Create count of frequency of each of the components for each assmb
+    bill = make_comp_popfreqs(bill)
     types = ['boss', 'adaptor', 'elbow', 'float', 'hfl', 'nut',
              'other', 'sleeve', 'straight', 'tee', 'threaded']
     # Store new column names
@@ -173,7 +176,8 @@ def gen_num_comp_type(bill_path, comp_path, cln_path):
     cols_to_keep = bill.columns.values
     # Store the stemmed merge variable
     merge_id = 'component_id'
-    # Recode NA to zero in bill of materials
+    # Recode NA to zero in bill of materials for quantity and component_id
+    # columns
     for slot in range(1, 9):
         quant = 'quantity_' + str(slot)
         comp_id = 'component_id_' + str(slot)
@@ -182,12 +186,14 @@ def gen_num_comp_type(bill_path, comp_path, cln_path):
     # Analyze each component type
     for comp in types:
         comp_df = pd.read_csv(comp_path+'comp_'+comp+".csv")
+        # Create a indicator for determining whether row merged
         comp_df['is_merged'] = 1
+        # code nulls to zero
         comp_df.ix[comp_df.weight.isnull(), 'weight'] = 0
+        # Code unique feature to boolean
         if 'unique_feature' not in comp_df:
             comp_df['unique_feature'] = 'No'
         comp_df['unique_feature'] = comp_df['unique_feature'] == 'Yes'
-        print comp_df.unique_feature
         # Loop over bill slots
         for slot in range(1, 9):
             # Merge component on to a single slot
@@ -201,16 +207,47 @@ def gen_num_comp_type(bill_path, comp_path, cln_path):
             # Increment the number of pieces for the component
             bill[comp+'_cnt'] += bill.is_merged * bill['quantity_'+str(slot)]
             bill['adjusted_wt'] += (bill.is_merged *
-                                    bill['quantity_'+str(slot)] * bill.weight)
+                                    bill['quantity_'+str(slot)] *
+                                    bill.weight)
             bill['adjusted_unique_cnt'] += (bill.is_merged *
                                             bill['quantity_'+str(slot)] *
                                             bill.unique_feature)
             # Drop component specific vars
             bill = bill.ix[:, cols_to_keep]
     new_cols.append('tube_assembly_id')
+    new_cols.append('freqs_for_comps')
     return bill[new_cols]
 
-bill = gen_num_comp_type(DATA_PATH+'bill_of_materials.csv', DATA_PATH, CLN_PATH)
+def make_comp_popfreqs(bill):
+    """
+    This summarizes how frequently each component
+    :param bill: bill_of_materials df
+    :return: bill_of materials with a measure of how frequently each
+     tube assembly's component appear in the data
+    """
+    slot1 = bill[['quantity_1','component_id_1']]
+    slot2 = bill[['quantity_2','component_id_2']]
+    slot3 = bill[['quantity_3','component_id_3']]
+    slot4 = bill[['quantity_4','component_id_4']]
+    slots = [slot1, slot2, slot3, slot4]
+    for slot in slots:
+        slot.columns = ['quant', 'comp']
+    # append all of the column slots
+    all_comps = pd.concat([slot1, slot2, slot3, slot4], ignore_index=True)
+    # drop NAs
+    all_comps = all_comps[np.isfinite(all_comps.quant)]
+    # Get sums of frequencies
+    grouped = all_comps.groupby('comp')
+    counts = grouped.sum().reset_index()
+    # Merge counts on to each compslot
+    bill['freqs_for_comps'] = 0
+    for slot in ['1', '2', '3', '4']:
+        bill = bill.merge(counts, how='left',
+                          left_on='component_id_'+str(slot), right_on='comp')
+        bill['freqs_for_comps'] += bill.quant
+        bill = bill.drop('quant', axis=1)
+        bill = bill.drop('comp', axis=1)
+    return bill
 
 def add_component_vars(df, comp, comp_var_list):
     """
@@ -250,13 +287,11 @@ def clean_merged_df(df):
     col_types = df.dtypes.reset_index()
     num_col_rows = col_types[col_types[0] != 'object']
     num_cols = list(num_col_rows['index'])
-    print num_cols
     for col in num_cols:
         mean = df[col].mean()
         df[col] = df[col].fillna(value=mean)
     # Treat non numeric cols as categoricals
     cat_cols = list(set(cols)-set(num_cols)-set(['tube_assembly_id',]))
-    print cat_cols
     # Encode categoricals as numerics
     for col in cat_cols:
         # Fill column missings with -1
@@ -318,31 +353,34 @@ def build_vars(df):
                 val.append(col)
     # Create miscellaenous variables
     df['comp_weight_sum'] = df[summ_cols['weight_median']].sum(axis=1)
-    df['apprx_density'] = df.comp_weight_sum/ (df.tube_length + .01)
+    df['apprx_density'] = df.comp_weight_sum/(df.tube_length + .01)
+    df['adj_apprx_density'] = df.adjusted_wt/(df.tube_length + .01)
     df['length_x_wall'] = df.tube_length * df.tube_wall
     df['radius_per_bend'] = df.tube_bend_radius/(df.tube_num_bends + .01)
     df['bend_per_length'] = df.tube_bend_radius/(df.tube_length + .01)
+    df['dia_over_len'] = df.tube_diameter/(df.tube_length + .01)
+    df['wall_over_diam'] = df.tube_wall/(df.tube_diameter + .01)
+    df['len_x_dai'] = df.tube_length * df.tube_diameter
     df['ext_over_overall'] = (df.elbow_extension_length_max /
-                                df.elbow_overall_length_max + .01)
+                              df.elbow_overall_length_max + .01)
     df['thick_ove_len'] = (df.elbow_thickness_max /
-                                df.elbow_overall_length_max + .01)
+                           df.elbow_overall_length_max + .01)
     df['comp_tot_cnt'] = df[summ_cols['materials_quantity']].sum(axis=1)
     df['specs_cnt'] = df[summ_cols['specs_']].sum(axis=1)
     df['plate_cnt'] = df[summ_cols['plating']].sum(axis=1)
     df['unq_cnt'] = df[summ_cols['unique']].sum(axis=1)
     df['thick_cnt'] = df[summ_cols['thick']].sum(axis=1)
     df['orient_cnt'] = df[summ_cols['orient']].sum(axis=1)
+
     df['is_min_order_quantity'] = df['min_order_quantity'] > 0
     df['ext_as_pct'] = df.elbow_extension_length_min/df.elbow_overall_length_min
     df = df.fillna(-1)
     # Drop variables with no variation
-    print len(df.columns.values)
     no_variation = ['sleeve_ori', 'sleeve_component_type',
                     'comp_component_type_id', 'boss_orient', 'nut_orient']
     for feat in all_cols:
         if any(x in feat for x in no_variation):
             df = df.drop(feat, axis=1)
-    print len(df.columns.values)
     return df
 
 ############### Define Globals ########################
@@ -439,6 +477,9 @@ for name, field_dict in comp_dict.iteritems():
     all_data_wtubeend = add_component_vars(all_data_wtubeend, name, field_dict)
 # Clean the resultant dataframe
 cleaned_all_data = clean_merged_df(all_data_wtubeend)
+# Merge and create bill vars
+bill = gen_bill_vars(DATA_PATH+'bill_of_materials.csv', DATA_PATH, CLN_PATH)
+cleaned_all_data = cleaned_all_data.merge(bill, on='tube_assembly_id')
 # Build modeling vars
 all_data_complete = build_vars(cleaned_all_data)
 # Export

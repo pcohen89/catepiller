@@ -121,9 +121,6 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
 ######################################################
 # Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
-### TEMP CODE
-all_data = all_data.merge(bill, on='tube_assembly_id')
-###########
 non_test = all_data[all_data.is_test == 0]
 test = all_data[all_data.is_test != 0]
 
@@ -229,4 +226,5 @@ test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'threeway vars with subsamp.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'h', index=False)
+#'threeway vars with bill vars.csv'
