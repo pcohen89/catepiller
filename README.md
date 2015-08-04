@@ -16,7 +16,7 @@ Summary statistics planned to use:
 - [x] Average numeric columns and binary
 - [x] Take max and min
 - [x] Count the number of instances of that comp type matched to the assembly
-- [ ] Count instances of that component id in the whole data set and merge that on
+- [x] Count instances of that component id in the whole data set and merge that on
 
 ### 2. Don't merge to the sub-component tables, just count instances of each component on the assembly
 In this case, the data will have a feature for each component. The feature will count how many of that component are present on the assembly instance. Note, sometimes you have multiples of the exact same component noted in var component_quantity, so this approach will allow us to incorporate that information in a way that 1. misses
@@ -26,6 +26,8 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Model with current data structure and include units as a field
 - [x] Somehow account for the fact that some tube assmblies have 4-7 observations associated with them
 - [x] Use 1/16th power rather than the 1 + log
+- [ ] Use 1/16th for stacking
+- [ ] Account for the fact the some tube assembly ids have multiple observations, which screws up weighting (how do you do the equiv of clustering for prediction)
 
 ### 4. Misc data ideas
 - [x] Sum weight from all components
@@ -35,8 +37,8 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] bends/length
 - [x] Flag if end_a != end_x
 - [x] Number of bends per bend radius (does this even make sense?)
-- [ ] Unique or rare part should be interacted with quantity
-- [ ] Analyze bill of materials quantity more, somehow I need to capture that if a given component is adding a lot of cost, than the quantity of that component is really important
+- [x] Unique or rare part should be interacted with quantity
+- [x] Analyze bill of materials quantity more, somehow I need to capture that if a given component is adding a lot of cost, than the quantity of that component is really important (it did turn out to be very important)
 - [x] maybe sum the number of tube assemblies associated with the supplier
 - [ ] Identify if any tubes are exactly similar to any others (or use some measure of similarity, or use knn)
 
@@ -46,7 +48,7 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Svm (small data means this might work okay)
 - [x] penalized regression
 - [x] NN (sigh, finding a reasonable specification has been a nightmare)
-- [ ] KNN (this might actually be a reasonable application for it, remember to normalize first)
+- [x] KNN (this might actually be a reasonable application for it, remember to normalize first)(this was bad)
 - [x] Try to get XGBOOST running
 - [x] Two stage stacking approach (first stage you create predictions for bunch of model using only two components at a time, second state you fite a ridge to all varaibles plus first stage predictions)
 
