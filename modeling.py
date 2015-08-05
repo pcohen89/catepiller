@@ -144,11 +144,7 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
 non_test = all_data[all_data.is_test == 0]
 unique_tube = 1
-if unique_tube == 1:
-    grouped = non_test.groupby('tube_assembly_id')
-    tube_maxquant = grouped.quantity.max().reset_index()
-    mrg_vars = ['tube_assembly_id', 'quantity']
-    non_test = non_test.merge(tube_maxquant, how='inner', on=mrg_vars)
+
 test = all_data[all_data.is_test != 0]
 
 # Create list of features
@@ -162,7 +158,7 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .028, 'silent': 1, 'subsample': .8}
+param = {'max_depth': 6, 'eta': .1, 'silent': 1, 'subsample': .85}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -170,13 +166,19 @@ for cv_fold in range(start_num, start_num+num_loops):
     # recode target variable to log(x+1) in trn and val
     #trn['target'] = trn['cost'].apply(lambda x: math.log(x+1))
     #val['target'] = val['cost'].apply(lambda x: math.log(x+1))
+    if unique_tube == 1:
+        trn['rand'] = (np.array(np.random.rand(len(trn.quantity),1)))
+        grouped = trn.groupby('tube_assembly_id')
+        tube_maxquant = grouped.rand.max().reset_index()
+        mrg_vars = ['tube_assembly_id', 'rand']
+        trn = trn.merge(tube_maxquant, how='inner', on=mrg_vars)
     trn['target'] = np.power(trn['cost'], .0625)
     val['target'] = np.power(val['cost'], .0625)
     # Gradient boosting
     xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']))
     xgb_val = xgb.DMatrix(np.array(val[feats]), label=np.array(val['target']))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost = xgb.train(param.items(), xgb_trn, 4000)
+    xboost = xgb.train(param.items(), xgb_trn, 1000)
     # Predict and rescale predictions
     val = write_xgb_preds(val, xgb_val, xboost, str(cv_fold), is_test=0)
     test = write_xgb_preds(test, xgb_test, xboost, str(cv_fold), is_test=1)
@@ -188,7 +190,7 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'4000 trees power bill vars 2nd set depth 8.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'rebalanced.csv', index=False)
 
 
 # Code for browsing feature importances
