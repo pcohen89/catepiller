@@ -190,38 +190,35 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 6, 'eta': .04, 'silent': 1, 'subsample': .8}
+param = {'max_depth': 7, 'eta': .0315, 'silent': 1, 'subsample': .80}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+    val['preds'+str(cv_fold)] = 0
+    test['preds'+str(cv_fold)] = 0
     # recode target variable to log(x+1) in trn and val
-    if unique_tube == 1:
+    for folds in range(1, 4):
         trn['rand'] = (np.array(np.random.rand(len(trn.quantity),1)))
         grouped = trn.groupby('tube_assembly_id')
         tube_maxquant = grouped.rand.max().reset_index()
-        tube_minquant = grouped.rand.min().reset_index()
         mrg_vars = ['tube_assembly_id', 'rand']
         trn1 = trn.merge(tube_maxquant, how='inner', on=mrg_vars)
-        trn2 = trn.merge(tube_minquant, how='inner', on=mrg_vars)
-    trn1['target'] = np.power(trn1['cost'], .0625)
-    trn2['target'] = np.power(trn2['cost'], .0625)
-    # Gradient boosting
-    xgb_trn1 = xgb.DMatrix(np.array(trn1[feats]), label=np.array(trn1['target']))
-    xgb_trn2 = xgb.DMatrix(np.array(trn2[feats]), label=np.array(trn2['target']))
-    xgb_val = xgb.DMatrix(np.array(val[feats]))
-    xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost1 = xgb.train(param.items(), xgb_trn1, 2000)
-    xboost2 = xgb.train(param.items(), xgb_trn2, 2000)
-    # Predict and rescale predictions
-    val = write_xgb_preds(val, xgb_val, xboost1, str(cv_fold)+'_1', is_test=0)
-    test = write_xgb_preds(test, xgb_test, xboost1, str(cv_fold)+'_1', is_test=0)
-    val = write_xgb_preds(val, xgb_val, xboost2, str(cv_fold)+'_2', is_test=0)
-    test = write_xgb_preds(test, xgb_test, xboost2, str(cv_fold)+'_2', is_test=0)
-    # Combine predictions
-    nm = 'preds'+str(cv_fold)
-    val[nm] = (val[nm+'_1'] + val[nm+'_2'])/2
-    test[nm] = (test[nm+'_1'] + test[nm+'_2'])/2
+        trn1['target'] = np.power(trn1['cost'], .0625)
+        # Gradient boosting
+        xgb_trn = xgb.DMatrix(np.array(trn1[feats]), label=np.array(trn1['target']))
+        xgb_val = xgb.DMatrix(np.array(val[feats]))
+        xgb_test = xgb.DMatrix(np.array(test[feats]))
+        xboost = xgb.train(param.items(), xgb_trn, 5000)
+        # Predict and rescale predictions
+        loop_nm = str(cv_fold)+'_'+str(folds)
+        val = write_xgb_preds(val, xgb_val, xboost, loop_nm, is_test=0)
+        test = write_xgb_preds(test, xgb_test, xboost, loop_nm, is_test=0)
+        # Combine predictions
+        nm = 'preds'+str(cv_fold)
+        val[nm] += val[nm+'_'+str(folds)]/3
+        test[nm] += test[nm+'_'+str(folds)]/3
+        print "mini loop is %s" % (rmsle(val['cost'], val[nm+'_'+str(folds)]))
     # Save score
     score = rmsle(val['cost'], val['preds'+str(cv_fold)])
     avg_score += score/num_loops
@@ -229,6 +226,8 @@ for cv_fold in range(start_num, start_num+num_loops):
 avg_score
 
 # Export test preds
+test['cost'] = test[['preds12', 'preds13', 'preds14',
+                     'preds15', 'preds16', 'preds17']].mean(axis=1)
 test['id'] = test['id'].apply(lambda x: int(x))
 test[['id', 'cost']].to_csv(SUBM_PATH+'rebalanced max.csv', index=False)
 
