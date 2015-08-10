@@ -159,7 +159,7 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 6, 'eta': .04, 'silent': 1, 'subsample': .8}
+param = {'max_depth': 8, 'eta': .028, 'silent': 1, 'subsample': .8}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -169,6 +169,7 @@ for cv_fold in range(start_num, start_num+num_loops):
     grouped = trn.groupby('tube_assembly_id')
     counts = grouped.one.sum().reset_index()
     counts = counts.rename(columns={'one': 'ob_weight'})
+    #counts['ob_weight'] = 1/counts['ob_weight']
     trn = trn.merge(counts, on='tube_assembly_id')
     # Gradient boosting
     xgb_trn = xgb.DMatrix(np.array(trn[feats]),
@@ -176,7 +177,7 @@ for cv_fold in range(start_num, start_num+num_loops):
                           weight=np.array(trn.ob_weight))
     xgb_val = xgb.DMatrix(np.array(val[feats]))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost = xgb.train(param.items(), xgb_trn, 2000)
+    xboost = xgb.train(param.items(), xgb_trn, 4000)
     # Predict and rescale predictions
     val = write_xgb_preds(val, xgb_val, xboost, str(cv_fold), is_test=0)
     test = write_xgb_preds(test, xgb_test, xboost, str(cv_fold), is_test=1)
@@ -188,7 +189,7 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'rebalanced max.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'upweighted 4000 trees.csv', index=False)
 
 ############ Run rebalanced xgb ################
 
@@ -238,7 +239,7 @@ for eta in [.004, .008, .012]:
 test['cost'] = test[['preds12', 'preds13', 'preds14',
                      'preds15', 'preds16', 'preds17']].mean(axis=1)
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'rebalanced max.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'rebalanced fitted.csv', index=False)
 
 ############ Browse feature importances ################
 
