@@ -118,6 +118,22 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
         df['cost'] += df[nm]/num_loops
     return df
 
+def gen_weights(df):
+    """
+    This creates weights based on the number of rows per tube assembly
+
+    :param df: data frame to add weights to
+    :return: dataframe with wieghts
+    """
+    df['one'] = 1
+    grouped = df.groupby('tube_assembly_id')
+    counts = grouped.one.sum().reset_index()
+    counts = counts.rename(columns={'one': 'ob_weight'})
+    counts['ob_weight'] = 1/counts['ob_weight']
+    df = df.merge(counts, on='tube_assembly_id')
+    df = df.drop('one')
+    return df
+
 ######################################################
 # Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
@@ -134,7 +150,7 @@ num_loops = 6
 start_num = 12
 # Run bagged models
 for cv_fold in range(start_num, start_num+num_loops):
-    param = {'max_depth': 6, 'eta': .14, 'silent': 1, 'subsample': .7}
+    param = {'max_depth': 6, 'eta': .13, 'silent': 1, 'subsample': .7}
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
     # recode target variable to log(x+1) in trn and val
@@ -142,6 +158,7 @@ for cv_fold in range(start_num, start_num+num_loops):
     val['target'] = np.power(val['cost'], .0625)
     # Separate samples for first stage and second stage
     feat_trn, mod_trn = create_val_and_train(trn, cv_fold, 'tube_assembly_id', .15)
+    feat_trn = gen_weights(feat_trn)
     # Create list of second stage modeling features
     stage2_feats = list(all_data.columns.values)
     non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
@@ -178,7 +195,8 @@ for cv_fold in range(start_num, start_num+num_loops):
                     first_loop = 1
                 # Create xgboost data sets
                 xgb_feat_trn = xgb.DMatrix(np.array(feat_trn[stage1_feats]),
-                                      label=np.array(feat_trn['target']))
+                                      label=np.array(feat_trn.target),
+                                      weight=np.array(feat_trn.ob_weight))
                 xgb_mod_trn = xgb.DMatrix(np.array(mod_trn[stage1_feats]),
                                       label=np.array(mod_trn['target']))
                 xgb_val = xgb.DMatrix(np.array(val[stage1_feats]))
@@ -221,10 +239,11 @@ for cv_fold in range(start_num, start_num+num_loops):
 print avg_score
 
 
-test['cost'] = test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].mean(axis=1)
+test['cost'] = test[['preds12', 'preds13', 'preds14',
+                     'preds15', 'preds16', 'preds17']].mean(axis=1)
 test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'h', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'stacking with new vars and power outcome.csv', index=False)
 #'threeway vars with bill vars.csv'
