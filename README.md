@@ -17,6 +17,7 @@ Summary statistics planned to use:
 - [x] Take max and min
 - [x] Count the number of instances of that comp type matched to the assembly
 - [x] Count instances of that component id in the whole data set and merge that on
+- [ ] Try data build that only takes one moment (min, median, max), first confirm that these moments are super highly correlated
 
 ### 2. Don't merge to the sub-component tables, just count instances of each component on the assembly
 In this case, the data will have a feature for each component. The feature will count how many of that component are present on the assembly instance. Note, sometimes you have multiples of the exact same component noted in var component_quantity, so this approach will allow us to incorporate that information in a way that 1. misses
@@ -26,8 +27,8 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Model with current data structure and include units as a field
 - [x] Somehow account for the fact that some tube assmblies have 4-7 observations associated with them
 - [x] Use 1/16th power rather than the 1 + log
-- [ ] Use 1/16th for stacking
-- [ ] Account for the fact the some tube assembly ids have multiple observations, which screws up weighting (how do you do the equiv of clustering for prediction)
+- [x] Use 1/16th for stacking
+- [x] Account for the fact the some tube assembly ids have multiple observations, which screws up weighting (how do you do the equiv of clustering for prediction)
 
 ### 4. Misc data ideas
 - [x] Sum weight from all components
