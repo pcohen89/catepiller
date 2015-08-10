@@ -42,10 +42,15 @@ def merge_subms(subm_dict, path, name, target):
 
 # Merge submissions
 subs_to_merge = {
-    '4000 trees power bill vars.csv': .29,
-    '4000 trees power no log.csv': .05,
-    '2500 trees power bill vars.csv': .10,
-    'threeway vars with bill vars.csv': .35,
+    '4000 trees power bill vars 2nd set depth 8.csv': .04,
+    'upweighted 4000 trees.csv': .12,
+    'downweighted 4000 trees.csv': .11,
+    '4000 trees power bill vars.csv': .04,
+    '4000 trees power no log.csv': .02,
+    '2500 trees power bill vars.csv': .05,
+    'weight 2500 trees.csv': .1,
+    'downweighted 2500 trees.csv': .03,
+    'threeway vars with bill vars.csv': .32,
     'threeway vars with subsamp.csv': .06,
     'threeway vars with forest.csv': .01,
     '1500 trees xgb.csv': .01,
@@ -57,19 +62,15 @@ subs_to_merge = {
     'xgboost from first data build.csv': .01,
     'stacking with higher eta.csv': .01,
     'stacking with ridge vars.csv': .01,
-    'cv stack with new vars frst second stage internal 243.csv': .01,
-    'stacking first attempt.csv': .01,
-    'cv stack.csv': .01,
-    'boost from first data build.csv': .01,
-    'randomforest from first data build.csv': .01
+    'cv stack with new vars frst second stage internal 243.csv': .01
 }
 
 total_weight = 0
 for key, val in subs_to_merge.iteritems():
     total_weight += val
 print "The total weight should be 1.0, it is: %s" % (total_weight)
-merge_subms(subs_to_merge, SUBM_PATH, 'blend r.csv', 'cost')
+merge_subms(subs_to_merge, SUBM_PATH, 'blend w.csv', 'cost')
 
-subm_correl('4000 trees power bill vars.csv',
-            '4000 trees power no log.csv', 'id', 'cost')
+subm_correl('blend w.csv',
+            'blend v.csv', 'id', 'cost')
 
