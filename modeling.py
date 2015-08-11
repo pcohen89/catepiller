@@ -1,8 +1,8 @@
-#__author__ = 'p_cohen'
+__author__ = 'p_cohen'
 
 ############## Import packages ########################
-from builtins import list, range, len, str, set, any
-from __builtin__ import int
+# Workaround for pycharm bug
+from __builtin__ import list, range, len, str, set, any, int
 
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
@@ -154,7 +154,7 @@ def gen_weights(df):
     counts = counts.rename(columns={'one': 'ob_weight'})
     counts['ob_weight'] = 1/counts['ob_weight']
     df = df.merge(counts, on='tube_assembly_id')
-    df = df.drop('one')
+    df = df.drop('one', axis=1)
     return df
 
 ############### Load data ######################
@@ -177,7 +177,7 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .028, 'silent': 1, 'subsample': .8}
+param = {'max_depth': 8, 'eta': .028, 'silent': 1, 'subsample': .5}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -202,7 +202,7 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'downweighted 4000 trees.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'downweighted 4000 trees w compset.csv', index=False)
 
 
 ############ Browse feature importances ################

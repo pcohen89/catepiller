@@ -40,14 +40,17 @@ def clean_component_data(comp_dict):
     column 3 type, .....
 
     """
-    # Loop through
+    # Loop through components
     for name, feat_list in comp_dict.iteritems():
         df = pd.read_csv(DATA_PATH + 'comp_' + name + '.csv')
+        # Execute adaptor specific cleaning steps
         if name == 'adaptor':
+            # Merge on types
             df_type = pd.read_csv(CLN_PATH + 'type_connection.csv')
             id_root = 'connection_type_id'
             df = df.merge(df_type, left_on=id_root + '_1', right_on=id_root)
             df = df.merge(df_type, left_on=id_root + '_2', right_on=id_root)
+            # Drop duplicative variables
             drop_vars = ['connection_type_id_x', 'connection_type_id_y',
                          'name_x', 'name_y']
             for var in drop_vars:
@@ -58,7 +61,7 @@ def clean_component_data(comp_dict):
                 lbl = preprocessing.LabelEncoder()
                 lbl.fit(list(df.ix[:, i]))
                 df.ix[:, i] = lbl.transform(df.ix[:, i])
-        # Spot fix nut (numeric column with string values
+        # Spot fix nut (numeric column with string values)
         if name == 'nut':
             # Encode as missing number
             for str_ in ['M12', 'M10', 'M8', 'M6']:
@@ -77,7 +80,7 @@ def clean_type_connection(path, outpath):
     """
     # Read data
     df_connect = pd.read_csv(path+'type_connection.csv')
-    # Build variables
+    # Extract common wordes from connection names
     df_connect['has_flare'] = df_connect['name'].apply(lambda x: 'Flare' in x)
     df_connect['has_flange'] = df_connect['name'].apply(lambda x: 'Flange' in x)
     df_connect['has_metric'] = df_connect['name'].apply(lambda x: 'Metric' in x)
@@ -146,13 +149,13 @@ def aggregate_compslots(df, comp, comp_var_list):
         # Save the root of the naming convention for aggregated variables
         base_nm = comp + '_' + var
         # use dictionary to check if column is numeric
-        #if ((comp_var_list[i] == 'num') or (comp_var_list[i] == 'bin')):
+        if ((comp_var_list[i] == 'num') or (comp_var_list[i] == 'bin')):
             # Aggregate list
-            #df[base_nm+"_median"] = df[var_list].median(axis=1)
+            df[base_nm+"_median"] = df[var_list].median(axis=1)
         if comp_var_list[i] != 'id':
             # Store max and min values of variable across types
             df[base_nm+"_max"] = df[var_list].max(axis=1)
-            #df[base_nm+"_min"] = df[var_list].min(axis=1)
+            df[base_nm+"_min"] = df[var_list].min(axis=1)
         # drop unaggregated variables
         df = df.drop(var_list, axis=1)
     return df
@@ -373,7 +376,7 @@ def clean_merged_df(df):
         df[col] = df[col].fillna(value="-1")
         lbl = preprocessing.LabelEncoder()
         lbl.fit(list(df[col]))
-        df[col] = lbl.transform(df.ix[:,col])
+        df[col] = lbl.transform(df.ix[:, col])
     return df
 
 def make_onehot_data(df, cat_cols, freq_thresh=.004):

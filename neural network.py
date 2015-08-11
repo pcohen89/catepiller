@@ -1,4 +1,9 @@
 __author__ = 'p_cohen'
+"""
+Neural networks, at least as currently implemented, do not seem to be an
+effective choice for this data set. I may come back to this if I run out of
+ideas.
+"""
 from builtins import list, range, len, str, set, any
 from __builtin__ import int
 
