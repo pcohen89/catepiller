@@ -9,27 +9,6 @@ from sklearn import preprocessing
 from datetime import datetime
 
 ############### Define Functions ########################
-def merge_noncomp(df, nm, lft_mrg, rt_mrg):
-    """
-    Merges the non component data sets onto the main training df
-    :param df: Main data set we are merging variables onto
-    :param nm: name of csv to merge on
-    :param lft_mrg: (str) left merge variable
-    :param rt_mrg: (str) right merge variable
-    :return: df
-    """
-    # Read in csv
-    df_tomerge = pd.read_csv(DATA_PATH + nm +'.csv')
-    # Rename columns to format tablename_column_name (if not merge variable)
-    columns = df_tomerge.columns.values
-    for col in columns:
-        if col != rt_mrg:
-            df_tomerge.rename(columns={col: nm + '_' + col}, inplace=True)
-    # Merge
-    df = pd.merge(df, df_tomerge, left_on=lft_mrg, right_on=rt_mrg, how='left')
-    return df
-
-
 def clean_component_data(comp_dict):
     """
     Reads in and cleans a Caterpiller tube component data sets according to
@@ -99,7 +78,7 @@ def clean_specs(path):
     :param path: path to save new specs file to
     """
     # Read in csv
-    df = pd.read_csv(DATA_PATH + 'specs.csv')
+    df = pd.read_csv(path + 'specs.csv')
     # Create list of all values that appear in data
     spec_vals = df.spec1.drop_duplicates()
     for spec_num in range(2, 11):
@@ -109,12 +88,16 @@ def clean_specs(path):
     spec_vals = [s for s in spec_vals if s == s]
     # Make binaries to represent whether tube has that spec
     for spec in spec_vals:
+        # Initilize list of variables only used in construction of other vars
         temp_list = []
         # Create true false for whether a column has a spec
-        for spec_col in range(1, 11):
-            cnt = str(spec_col)
-            temp_list.append('temp'+cnt)
-            df['temp'+cnt] = df['spec'+cnt].apply(lambda x: spec in str(x))
+        for spec_num in range(1, 11):
+            cnt = str(spec_num)
+            # Add temporary indicator to list of variables to not keep
+            temp_list.append('temp' + cnt)
+            # Create temporary indicator of rows where a given spec slot
+            # matches the spec being summarized
+            df['temp' + cnt] = df['spec' + cnt].apply(lambda x: spec in str(x))
         # Record whether any column contains spec
         df['s_'+spec[3:]] = df[temp_list].max(axis=1)
         # Drop column if spec value is very rare
@@ -123,12 +106,32 @@ def clean_specs(path):
         df = df.drop(temp_list, axis=1)
     df.to_csv(DATA_PATH + 'reshaped_specs.csv', index=False)
 
+def merge_noncomp(df, nm, lft_mrg, rt_mrg):
+    """
+    Merges the non component data sets onto the main training df
+    :param df: Main data set we are merging variables onto
+    :param nm: name of csv to merge on
+    :param lft_mrg: (str) left merge variable
+    :param rt_mrg: (str) right merge variable
+    :return: df
+    """
+    # Read in csv
+    df_tomerge = pd.read_csv(DATA_PATH + nm +'.csv')
+    # Rename columns to format tablename_column_name (if not merge variable)
+    columns = df_tomerge.columns.values
+    for col in columns:
+        if col != rt_mrg:
+            df_tomerge.rename(columns={col: nm + '_' + col}, inplace=True)
+    # Merge
+    df = pd.merge(df, df_tomerge, left_on=lft_mrg, right_on=rt_mrg, how='left')
+    return df
 
 def aggregate_compslots(df, comp, comp_var_list):
     """
     This function adds component data to the main df using matches from
     bill of materials.
-    If a given component type has multiple instances in one assembly (i.e an
+    If a given component type
+     has multiple instances in one assembly (i.e an
     assembly has three nuts on it) then this function creates summary statistics
     that aggregate field values for each instance of that component type
     """
@@ -218,16 +221,16 @@ def create_comp_for_billvars(comp, comp_path):
     # code nulls to zero
     component.ix[component.weight.isnull(), 'weight'] = 0
     # Code feature to boolean, make sure they exist
-    vars_to_create_no = ['unique_feature', 'groove', 'plating']
-    for var in vars_to_create_no:
+    vars_to_init_no = ['unique_feature', 'groove', 'plating']
+    for var in vars_to_init_no:
         # If variable isn't in this component, create all no's
         if var not in component:
             component[var] = 'No'
         # Cast to boolean
         component[var] = component[var] == 'Yes'
     # Code overall length to zero if missing
-    vars_to_create_zero = ['overall_length', 'thickness']
-    for var in vars_to_create_zero:
+    vars_to_init_zero = ['overall_length', 'thickness']
+    for var in vars_to_init_zero:
         if var not in component:
             component[var] = 0
     return component
@@ -252,8 +255,8 @@ def merge_compslot_for_billvars(comp_df, main_df, slot, cols_to_keep, comp):
     merge_nm = 'component_id'
     # Merge component on to a single slot
     main_df = main_df.merge(comp_df, how="left",
-                      left_on=merge_nm + '_' +str(slot),
-                      right_on=merge_nm)
+                            left_on=merge_nm + '_' + str(slot),
+                            right_on=merge_nm)
     # code is_merged as zero if record didn't merge
     zero_vars = ['is_merged', 'weight', 'unique_feature',
                  'overall_length', 'groove', 'plating', 'thickness']
@@ -266,7 +269,7 @@ def merge_compslot_for_billvars(comp_df, main_df, slot, cols_to_keep, comp):
         'adjusted_wt': 'weight', 'groove_cnt': 'groove', 'plating_cnt':
         'plating', 'adjusted_unique_cnt': 'unique_feature',
         'overall_len_sum': 'overall_length', 'thickness_sum': 'thickness'
-     }
+    }
     for new_name, base_var in new_features.iteritems():
         main_df[new_name] += (quant_mergd * main_df[base_var])
     # Drop component specific vars
@@ -296,14 +299,16 @@ def make_comp_popfreqs(bill):
     :return: bill_of materials with a measure of how frequently each
      tube assembly's component appear in the data
     """
+    # create mini data frames with component id and component quantity
     slot1 = bill[['quantity_1', 'component_id_1']]
     slot2 = bill[['quantity_2', 'component_id_2']]
     slot3 = bill[['quantity_3', 'component_id_3']]
     slot4 = bill[['quantity_4', 'component_id_4']]
     slots = [slot1, slot2, slot3, slot4]
+    # Rename the columns in each mini df
     for slot in slots:
         slot.columns = ['quant', 'comp']
-    # append all of the column slots
+    # append all of the mini dfs together
     all_comps = pd.concat([slot1, slot2, slot3, slot4], ignore_index=True)
     # drop NAs
     all_comps = all_comps[np.isfinite(all_comps.quant)]
@@ -316,8 +321,7 @@ def make_comp_popfreqs(bill):
         bill = bill.merge(counts, how='left',
                           left_on='component_id_'+str(slot), right_on='comp')
         bill['freqs_for_comps'] += bill.quant
-        bill = bill.drop('quant', axis=1)
-        bill = bill.drop('comp', axis=1)
+        bill = bill.drop(['quant', 'comp'], axis=1)
     return bill
 
 
@@ -470,14 +474,14 @@ DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
 
 # Data dictionary for cleaning comp tables
-comp_dict = {
+COMP_DICT = {
     'boss': [
         'id', 'cat', 'cat', 'cat', 'cat', 'cat', 'num', 'num',
         'num', 'bin', 'num', 'num', 'bin', 'bin', 'num'
     ],
     'adaptor': [
-        'id', 'cat', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'cat',
-        'cat', 'num', 'num', 'num', 'num', 'num', 'bin', 'bin', 'num'
+        'id', 'cat', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num',
+        'cat', 'cat', 'num', 'num', 'num', 'num', 'num', 'bin', 'bin', 'num'
     ],
     'elbow': [
         'id', 'cat', 'num', 'num', 'num', 'num', 'num', 'num', 'num',
@@ -524,15 +528,15 @@ all_data = non_test.append(test)
 all_data = add_supp_var(all_data)
 # Clean data sets
 clean_type_connection(DATA_PATH, CLN_PATH)
-clean_component_data(comp_dict)
+clean_component_data(COMP_DICT)
 clean_specs(DATA_PATH)
 # After cleaning, adaptor has more columns
-comp_dict['adaptor'] = [
+COMP_DICT['adaptor'] = [
     'id', 'cat', 'num', 'num', 'cat', 'cat', 'num', 'num', 'num', 'num', 'cat',
     'cat', 'num', 'num', 'num', 'num', 'num', 'bin', 'bin', 'num',
     'bin', 'bin', 'bin', 'bin', 'bin', 'bin', 'bin', 'bin',
 ]
-# Merge on needed data sets
+# Merge on non-component data sets
 tube_merge_csvs = ['tube', 'bill_of_materials', 'reshaped_specs']
 for csv in tube_merge_csvs:
     all_data = merge_noncomp(all_data, csv, 'tube_assembly_id',
@@ -555,13 +559,13 @@ columns_for_onehot = {'tube_material_id': 'tube_mat',
 all_data_onehot = make_onehot_data(all_data_onehot, columns_for_onehot)
 cleaned_all_data_onehot = clean_merged_df(all_data_onehot)
 # Iteratively merge on each component data set
-for name, field_dict in comp_dict.iteritems():
+for name, field_dict in COMP_DICT.iteritems():
     all_data_wtubeend = add_component_vars(all_data_wtubeend, name, field_dict)
 # Clean the resultant dataframe
 cleaned_all_data = clean_merged_df(all_data_wtubeend)
 # Merge and create bill vars
-bill = gen_bill_vars(DATA_PATH+'bill_of_materials.csv', DATA_PATH)
-cleaned_all_data = cleaned_all_data.merge(bill, on='tube_assembly_id')
+bill_vars = gen_bill_vars(DATA_PATH+'bill_of_materials.csv', DATA_PATH)
+cleaned_all_data = cleaned_all_data.merge(bill_vars, on='tube_assembly_id')
 # Build modeling vars
 all_data_complete = build_vars(cleaned_all_data)
 # Export
