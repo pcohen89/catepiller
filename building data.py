@@ -1,7 +1,6 @@
 __author__ = 'p_cohen'
 
-from builtins import list, range, len, str, set, any
-from __builtin__ import int
+from __builtin__ import list, range, len, str, set, any, int
 
 import pandas as pd
 from sklearn import preprocessing
@@ -158,7 +157,7 @@ def aggregate_compslots(df, comp, comp_var_list):
         df = df.drop(var_list, axis=1)
     return df
 
-def gen_bill_vars(bill_path, comp_path, cln_path):
+def gen_bill_vars(bill_path, comp_path):
     """
     This file extracts information from component files differently than
     previous attempts, tries to aggregate information from multiple components
@@ -182,15 +181,16 @@ def gen_bill_vars(bill_path, comp_path, cln_path):
     # Initialize new columns
     for col in new_cols:
         bill[col] = 0
-    # Store original column names
-    cols_to_keep = bill.columns.values
     # Recode NA to zero in bill of materials for quantity and component_id
     # columns
     for slot in range(1, 9):
         quant = 'quantity_' + str(slot)
         comp_id = 'component_id_' + str(slot)
         bill[quant] = bill[quant].fillna(value=0)
-        bill[comp_id] = bill[comp_id].fillna(value=0)
+        bill[comp_id] = bill[comp_id].fillna(value="NA")
+    # Create count of each component set
+    bill = create_freq_of_compset(bill)
+    cols_to_keep = bill.columns.values
     # Analyze each component type
     for comp in types:
         # Create and prepare component dataframe
@@ -200,9 +200,10 @@ def gen_bill_vars(bill_path, comp_path, cln_path):
             bill = merge_compslot_for_billvars(comp_df, bill, slot,
                                                cols_to_keep, comp)
     # Append extra vars
-    for ex_var in ['tube_assembly_id',]:
+    for ex_var in ['tube_assembly_id', 'compset_cnt']:
         new_cols.append(ex_var)
     return bill[new_cols]
+
 
 def create_comp_for_billvars(comp, comp_path):
     """
@@ -227,6 +228,7 @@ def create_comp_for_billvars(comp, comp_path):
         if var not in component:
             component[var] = 0
     return component
+
 
 def merge_compslot_for_billvars(comp_df, main_df, slot, cols_to_keep, comp):
     """
@@ -268,6 +270,22 @@ def merge_compslot_for_billvars(comp_df, main_df, slot, cols_to_keep, comp):
     main_df = main_df.ix[:, cols_to_keep]
     return main_df
 
+
+def create_freq_of_compset(df):
+    """
+    Creates a count of number of times tube's component set appears in
+    data
+    """
+    comp_ids = ['component_id_1', 'component_id_2', 'component_id_3',
+                'component_id_4', 'component_id_5', 'component_id_6',
+                'component_id_7', 'component_id_8']
+    # Create counts by component set
+    grouped = df.groupby(comp_ids)
+    counts = grouped.tube_assembly_id.count().reset_index()
+    counts = counts.rename(columns={0: 'compset_cnt'})
+    df = df.merge(counts, on=comp_ids)
+    return df
+
 def make_comp_popfreqs(bill):
     """
     This summarizes how frequently each component
@@ -299,6 +317,7 @@ def make_comp_popfreqs(bill):
         bill = bill.drop('comp', axis=1)
     return bill
 
+
 def add_component_vars(df, comp, comp_var_list):
     """
     This merges a comp_* table onto bill_of_materials and takes aggregated
@@ -320,6 +339,7 @@ def add_component_vars(df, comp, comp_var_list):
                       right_on=right_merge_var)
     df = aggregate_compslots(df, comp, comp_var_list)
     return df
+
 
 def clean_merged_df(df):
     """
@@ -537,16 +557,10 @@ for name, field_dict in comp_dict.iteritems():
 # Clean the resultant dataframe
 cleaned_all_data = clean_merged_df(all_data_wtubeend)
 # Merge and create bill vars
-bill = gen_bill_vars(DATA_PATH+'bill_of_materials.csv', DATA_PATH, CLN_PATH)
+bill = gen_bill_vars(DATA_PATH+'bill_of_materials.csv', DATA_PATH)
 cleaned_all_data = cleaned_all_data.merge(bill, on='tube_assembly_id')
 # Build modeling vars
 all_data_complete = build_vars(cleaned_all_data)
 # Export
 all_data_complete.to_csv(CLN_PATH + "full_data.csv", index=False)
 
-# Explore bill of materials
-
-bill = pd.read_csv(DATA_PATH + "bill_of_materials.csv")
-bill_ids = bill[['component_id_1', 'component_id_2', 'component_id_3',
-                'component_id_4', 'component_id_5', 'component_id_6',
-                'component_id_7', 'component_id_8']]
