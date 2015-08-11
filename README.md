@@ -42,6 +42,7 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Analyze bill of materials quantity more, somehow I need to capture that if a given component is adding a lot of cost, than the quantity of that component is really important (it did turn out to be very important)
 - [x] maybe sum the number of tube assemblies associated with the supplier
 - [ ] Identify if any tubes are exactly similar to any others (or use some measure of similarity, or use knn)
+- [ ] 'other' seems to give good results, look into this component and manually extracting variables
 
 ## Modeling approaches
 - [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
