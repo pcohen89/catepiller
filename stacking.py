@@ -1,10 +1,11 @@
 __author__ = 'p_cohen'
+from builtins import list, range, len, str, set, any
+from __builtin__ import int
 
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Lasso, Ridge
 import numpy as np
-import math
 import sys
 sys.path.append('/home/vagrant/xgboost/wrapper')
 import xgboost as xgb
@@ -131,7 +132,7 @@ def gen_weights(df):
     counts = counts.rename(columns={'one': 'ob_weight'})
     counts['ob_weight'] = 1/counts['ob_weight']
     df = df.merge(counts, on='tube_assembly_id')
-    df = df.drop('one')
+    df = df.drop('one', axis=1)
     return df
 
 ######################################################
@@ -245,5 +246,5 @@ test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'stacking with new vars and power outcome.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'downweight stack.csv', index=False)
 #'threeway vars with bill vars.csv'

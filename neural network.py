@@ -1,4 +1,6 @@
 __author__ = 'p_cohen'
+from builtins import list, range, len, str, set, any
+from __builtin__ import int
 
 import pandas as pd
 from keras.models import Sequential

@@ -1,6 +1,9 @@
 #__author__ = 'p_cohen'
 
 ############## Import packages ########################
+from builtins import list, range, len, str, set, any
+from __builtin__ import int
+
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Lasso
@@ -9,8 +12,7 @@ import math
 import sys
 sys.path.append('/home/vagrant/xgboost/wrapper')
 import xgboost as xgb
-from sklearn.preprocessing import StandardScaler
-from sklearn.neighbors import KNeighborsRegressor
+
 
 ############### Define Globals ########################
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
