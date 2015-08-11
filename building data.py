@@ -3,30 +3,30 @@ __author__ = 'p_cohen'
 from __builtin__ import list, range, len, str, set, any, int
 
 import pandas as pd
-from sklearn import preprocessing
 import numpy as np
+
+from sklearn import preprocessing
 from datetime import datetime
 
 ############### Define Functions ########################
-def merge_noncomp(df, nm, left_merge, right_merge):
+def merge_noncomp(df, nm, lft_mrg, rt_mrg):
     """
     Merges the non component data sets onto the main training df
     :param df: Main data set we are merging variables onto
     :param nm: name of csv to merge on
-    :param left_merge: (str) left merge variable
-    :param right_merge: (str) right merge variable
+    :param lft_mrg: (str) left merge variable
+    :param rt_mrg: (str) right merge variable
     :return: df
     """
     # Read in csv
-    merge_df = pd.read_csv(DATA_PATH + nm +'.csv')
+    df_tomerge = pd.read_csv(DATA_PATH + nm +'.csv')
     # Rename columns to format tablename_column_name (if not merge variable)
-    columns = merge_df.columns.values
+    columns = df_tomerge.columns.values
     for col in columns:
-        if col != right_merge:
-            merge_df.rename(columns={col: nm + '_' + col}, inplace=True)
+        if col != rt_mrg:
+            df_tomerge.rename(columns={col: nm + '_' + col}, inplace=True)
     # Merge
-    df = pd.merge(df, merge_df, left_on=left_merge,
-                  right_on=right_merge, how='left')
+    df = pd.merge(df, df_tomerge, left_on=lft_mrg, right_on=rt_mrg, how='left')
     return df
 
 
@@ -63,7 +63,7 @@ def clean_component_data(comp_dict):
                 df.ix[:, i] = lbl.transform(df.ix[:, i])
         # Spot fix nut (numeric column with string values)
         if name == 'nut':
-            # Encode as missing number
+            # Encode as negative number to represent missing
             for str_ in ['M12', 'M10', 'M8', 'M6']:
                 df.ix[df.thread_size == str_, 'thread_size'] = -1*int(str_[1:])
         if name == 'threaded':
@@ -100,7 +100,7 @@ def clean_specs(path):
     """
     # Read in csv
     df = pd.read_csv(DATA_PATH + 'specs.csv')
-    # Initialize list of all values that appear
+    # Create list of all values that appear in data
     spec_vals = df.spec1.drop_duplicates()
     for spec_num in range(2, 11):
         spec_vals = spec_vals.append(df['spec'+str(spec_num)].drop_duplicates())
