@@ -279,10 +279,7 @@ def merge_compslot_for_billvars(comp_df, main_df, slot, cols_to_keep, comp):
 
 
 def create_freq_of_compset(df):
-    """
-    Creates a count of number of times tube's component set appears in
-    data
-    """
+    """ Counts times tube's component set appears in data """
     comp_ids = ['component_id_1', 'component_id_2', 'component_id_3',
                 'component_id_4', 'component_id_5', 'component_id_6',
                 'component_id_7', 'component_id_8']
@@ -384,32 +381,6 @@ def clean_merged_df(df):
         df[col] = lbl.transform(df.ix[:, col])
     return df
 
-def make_onehot_data(df, cat_cols, freq_thresh=.004):
-    """
-    This adds dummies to a data frame to represent a categorical variable
-    as a set of dummy variables
-
-    :param df: dataframe to encode one hot variables into
-    :param cols: (dict) key - column in df to onehot encode, value - naming
-    convention for the dummies
-    :param freq_thresh: threshold for % of time a dummy needs to be 1 to be
-    included
-    :return: df with dummies
-    """
-    # loop through columns and nameing conventions
-    for col, name in cat_cols.iteritems():
-        # Create all dummies for column of interest
-        onehot = pd.get_dummies(df[col], prefix=name)
-        # Calc means of dummiers
-        means = onehot.mean().reset_index()
-        # Drop dummies that appear infrequently
-        means = means[means[0]> freq_thresh]
-        cols_to_keep = list(means['index'])
-        onehot = onehot[cols_to_keep]
-        # Append columnwise
-        df = pd.concat([df, onehot], axis=1)
-        df.drop(col, axis=1)
-    return df
 
 def add_supp_var(df):
     """
@@ -470,6 +441,34 @@ def build_vars(df):
             df = df.drop(feat, axis=1)
     return df
 
+def create_component_appearance_dt(df):
+    """
+    Creates variable representing number of components close to their appearance
+    date
+    """
+    # Initialize output variable
+    df['first_year_appeared_cnt'] = 0
+    # Get list of component ids
+    ids = list(df.bill_of_materials_component_id_1.drop_duplicates())
+    for id in ids:
+        # Identify first year
+        first_year = 9999
+        for num in range(1, 5):
+            id_match = df['bill_of_materials_component_id_' + str(num)] == id
+            first_year = min(first_year, df.ix[id_match, 'year'].min())
+        # Create match conditions
+        is_id_match = ((df.bill_of_materials_component_id_1 == id) |
+                       (df.bill_of_materials_component_id_2 == id) |
+                       (df.bill_of_materials_component_id_3 == id) |
+                       (df.bill_of_materials_component_id_4 == id))
+        is_date_match = (df.year == first_year)
+        match_cond = (is_id_match & is_date_match)
+        df.ix[match_cond, 'first_year_appeared_cnt'] += 1
+    return df
+
+non_test = create_component_appearance_dt(all_data)
+
+
 ############### Define Globals ########################
 DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
@@ -515,9 +514,8 @@ COMP_DICT = {
 }
 
 #############################################################################
-############### Run live code ###############################################
+##################### Run live code #########################################
 #############################################################################
-
 # Load train and test data
 non_test = pd.read_csv(DATA_PATH + 'train_set.csv')
 non_test['is_test'] = 0
@@ -548,17 +546,6 @@ for tube_end in ['a', 'x']:
                              "tube_end_" + tube_end, "end_form_id")
 # Rename data after adding datasets
 all_data_wtubeend = all_data
-all_data_onehot = pd.DataFrame(all_data)
-# Create a small oneHot data set (old pandas has a much less capable
-#  get_dummies
-columns_for_onehot = {'tube_material_id': 'tube_mat',
-                      'bill_of_materials_component_id_1': 'comp1',
-                      'bill_of_materials_component_id_2': 'comp2',
-                      'bill_of_materials_component_id_3': 'comp3',
-                      'bill_of_materials_component_id_4': 'comp4'
-                     }
-all_data_onehot = make_onehot_data(all_data_onehot, columns_for_onehot)
-cleaned_all_data_onehot = clean_merged_df(all_data_onehot)
 # Iteratively merge on each component data set
 for name, field_dict in COMP_DICT.iteritems():
     all_data_wtubeend = add_component_vars(all_data_wtubeend, name, field_dict)
