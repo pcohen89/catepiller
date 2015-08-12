@@ -152,7 +152,7 @@ def gen_weights(df):
     grouped = df.groupby('tube_assembly_id')
     counts = grouped.one.sum().reset_index()
     counts = counts.rename(columns={'one': 'ob_weight'})
-    counts['ob_weight'] = 1/counts['ob_weight']
+    counts['ob_weight'] = counts['ob_weight']
     df = df.merge(counts, on='tube_assembly_id')
     df = df.drop('one', axis=1)
     return df
@@ -161,13 +161,11 @@ def gen_weights(df):
 # Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
 non_test = all_data[all_data.is_test == 0]
-unique_tube = 1
-
 test = all_data[all_data.is_test != 0]
 
 # Create list of features
 feats = list(all_data.columns.values)
-non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
+non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost', 'first_year_appeared_cnt']
 for var in non_feats:
     feats.remove(var)
 
@@ -177,7 +175,7 @@ avg_score = 0
 num_loops = 6
 start_num = 12
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .028, 'silent': 1, 'subsample': .5}
+param = {'max_depth': 8, 'eta': .0245, 'silent': 1, 'subsample': .5}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -190,7 +188,7 @@ for cv_fold in range(start_num, start_num+num_loops):
                           weight=np.array(trn.ob_weight))
     xgb_val = xgb.DMatrix(np.array(val[feats]))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost = xgb.train(param.items(), xgb_trn, 4000)
+    xboost = xgb.train(param.items(), xgb_trn, 6500)
     # Predict and rescale predictions
     val = write_xgb_preds(val, xgb_val, xboost, str(cv_fold), is_test=0)
     test = write_xgb_preds(test, xgb_test, xboost, str(cv_fold), is_test=1)
@@ -202,11 +200,10 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'downweighted 4000 trees w compset.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'upweighted 6500 trees no compset.csv', index=False)
 
 
 ############ Browse feature importances ################
-
 # Code for browsing feature importances
 for cv_fold in range(1, 2):
     # Create trn val samples
@@ -215,8 +212,13 @@ for cv_fold in range(1, 2):
     trn['target'] = trn.cost.apply(lambda x: math.log(x+1))
     val['target'] = val.cost.apply(lambda x: math.log(x+1))
     # Gradient boosting
-    frst = RandomForestRegressor(n_estimators=100, n_jobs=8)
+    frst = RandomForestRegressor(n_estimators=200, n_jobs=8)
     frst.fit(trn[feats], trn['target'])
     outputs = pd.DataFrame({'feats': feats,
                            'weight': frst.feature_importances_})
-    print outputs.sort(columns='weight', ascending=False)
+    outputs = outputs.sort(columns='weight', ascending=False)
+    val = write_preds(val, frst, cv_fold, feats)
+    # Score loop
+    score = rmsle(val['cost'], val['preds'+str(cv_fold)])
+    print "Score for fold %s is: %s" % (cv_fold, score)
+    print outputs

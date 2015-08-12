@@ -182,10 +182,15 @@ for cv_fold in range(start_num, start_num+num_loops):
                                 'tube_num_bracket', 'tube_other',
                                 'adjusted_unique_cnt',
                                 'year', 'month', 'dayofyear',
-                                'comp_weight_sum',
+                                'comp_weight_sum', 'first_year_appeared_cnt',
                                 'comp_tot_cnt', 'specs_cnt', 'adjusted_wt',
-                                'is_min_order_quantity', 'ext_as_pct'
-                ]
+                                'is_min_order_quantity', 'ext_as_pct',
+                                'len_x_dai', 'dia_over_len', 'wall_over_diam',
+                                'unq_cnt', 'thick_cnt', 'orient_cnt',
+                                'bend_per_length', 'radius_per_bend',
+                                'ann_use_ove_q', 'length_x_wall',
+                                'supplier_freq', 'dayofweek'
+                                ]
                 # Add all feats that match either component type
                 # Note: see data building for how shorten this if statement
                 for feat in all_feats:

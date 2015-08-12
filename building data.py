@@ -1,6 +1,6 @@
 __author__ = 'p_cohen'
 
-from __builtin__ import list, range, len, str, set, any, int
+from __builtin__ import list, range, len, str, set, any, int, min
 
 import pandas as pd
 import numpy as np
@@ -197,7 +197,6 @@ def gen_bill_vars(bill_path, comp_path):
     # Create count of each component set
     bill = create_freq_of_compset(bill)
     cols_to_keep = bill.columns.values
-    print cols_to_keep
     # Analyze each component type
     for comp in types:
         # Create and prepare component dataframe
@@ -397,6 +396,7 @@ def add_supp_var(df):
 def build_vars(df):
     """ This builds some miscellaneous variables that I
     manually determined could be useful for modeling """
+    df = create_component_appearance_dt(df)
     all_cols = df.columns.values
     summ_cols = {'weight_median': [], 'materials_quantity': [], 'specs_': [],
                  'unique': [], 'thick': [], 'orient': [], 'plating': []}
@@ -441,30 +441,30 @@ def build_vars(df):
             df = df.drop(feat, axis=1)
     return df
 
-def create_component_appearance_dt(df):
+def create_component_appearance_dt(tube_df):
     """
     Creates variable representing number of components close to their appearance
     date
     """
     # Initialize output variable
-    df['first_year_appeared_cnt'] = 0
+    tube_df['first_year_appeared_cnt'] = 0
     # Get list of component ids
-    ids = list(df.bill_of_materials_component_id_1.drop_duplicates())
+    ids = list(tube_df.bill_of_materials_component_id_1.drop_duplicates())
     for id in ids:
         # Identify first year
         first_year = 9999
         for num in range(1, 5):
-            id_match = df['bill_of_materials_component_id_' + str(num)] == id
-            first_year = min(first_year, df.ix[id_match, 'year'].min())
+            mtch = tube_df['bill_of_materials_component_id_' + str(num)] == id
+            first_year = min(first_year, tube_df.ix[mtch, 'year'].min())
         # Create match conditions
-        is_id_match = ((df.bill_of_materials_component_id_1 == id) |
-                       (df.bill_of_materials_component_id_2 == id) |
-                       (df.bill_of_materials_component_id_3 == id) |
-                       (df.bill_of_materials_component_id_4 == id))
-        is_date_match = (df.year == first_year)
+        is_id_match = ((tube_df.bill_of_materials_component_id_1 == id) |
+                       (tube_df.bill_of_materials_component_id_2 == id) |
+                       (tube_df.bill_of_materials_component_id_3 == id) |
+                       (tube_df.bill_of_materials_component_id_4 == id))
+        is_date_match = (tube_df.year == first_year)
         match_cond = (is_id_match & is_date_match)
-        df.ix[match_cond, 'first_year_appeared_cnt'] += 1
-    return df
+        tube_df.ix[match_cond, 'first_year_appeared_cnt'] += 1
+    return tube_df
 
 non_test = create_component_appearance_dt(all_data)
 
