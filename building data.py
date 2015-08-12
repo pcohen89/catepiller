@@ -197,6 +197,7 @@ def gen_bill_vars(bill_path, comp_path):
     # Create count of each component set
     bill = create_freq_of_compset(bill)
     cols_to_keep = bill.columns.values
+    print cols_to_keep
     # Analyze each component type
     for comp in types:
         # Create and prepare component dataframe
