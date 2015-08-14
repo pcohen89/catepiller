@@ -17,7 +17,7 @@ Summary statistics planned to use:
 - [x] Take max and min
 - [x] Count the number of instances of that comp type matched to the assembly
 - [x] Count instances of that component id in the whole data set and merge that on
-- [ ] Try data build that only takes one moment (min, median, max), first confirm that these moments are super highly correlated
+- [x] Try data build that only takes one moment (min, median, max), first confirm that these moments are super highly correlated
 
 ### 2. Don't merge to the sub-component tables, just count instances of each component on the assembly
 In this case, the data will have a feature for each component. The feature will count how many of that component are present on the assembly instance. Note, sometimes you have multiples of the exact same component noted in var component_quantity, so this approach will allow us to incorporate that information in a way that 1. misses
@@ -41,8 +41,10 @@ In this case, the data will have a feature for each component. The feature will 
 - [x] Unique or rare part should be interacted with quantity
 - [x] Analyze bill of materials quantity more, somehow I need to capture that if a given component is adding a lot of cost, than the quantity of that component is really important (it did turn out to be very important)
 - [x] maybe sum the number of tube assemblies associated with the supplier
-- [ ] Identify if any tubes are exactly similar to any others (or use some measure of similarity, or use knn)
-- [ ] 'other' seems to give good results, look into this component and manually extracting variables
+- [ ] Identify if any tubes are exactly similar to any others (I have done this and it doesnt seem to help as much as expected, need to do further inquiry)
+- [ ] Interact year with other major variables
+- [x] 'other' seems to give good results, look into this component and manually extracting variables
+- 
 
 ## Modeling approaches
 - [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
