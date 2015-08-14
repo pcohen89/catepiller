@@ -68,22 +68,24 @@ old_files_to_merge = {
 }
 
 files2500_to_merge = {
-    '2500 trees power bill vars.csv': .08,
-    'weight 2500 trees.csv': .31,
-    '2500 with new folds.csv': .38,
-    'downweighted 2500 trees.csv': .23,
+    '2500 with new folds and colsamp.csv': .65,
+    '2500 trees power bill vars.csv': .05,
+    'weight 2500 trees.csv': .1,
+    '2500 with new folds.csv': .1,
+    'downweighted 2500 trees.csv': .10,
 
 }
 
 hightrees_to_merge = {
-    '4000 trees power bill vars 2nd set depth 8.csv': .27,
-    'upweighted 4000 trees.csv': .07,
-    'upweighted 6500 trees no compset.csv': .13,
-    '6500 with new folds.csv': .33,
-    'downweighted 4000 trees.csv': .04,
-    'downweighted 6500 trees w compset.csv': .05,
-    '4000 trees power bill vars.csv': .05,
-    '4000 trees power no log.csv': .06,
+    '6500 with new folds and colsamp.csv': .71,
+    '4000 trees power bill vars 2nd set depth 8.csv': .05,
+    'upweighted 4000 trees.csv': .02,
+    'upweighted 6500 trees no compset.csv': .07,
+    '6500 with new folds.csv': .02,
+    'downweighted 4000 trees.csv': .03,
+    'downweighted 6500 trees w compset.csv': .04,
+    '4000 trees power bill vars.csv': .03,
+    '4000 trees power no log.csv': .03,
 }
 
 stacking_to_merge = {
@@ -97,12 +99,13 @@ check_weight_and_merge(files2500_to_merge, '2500 files.csv')
 check_weight_and_merge(hightrees_to_merge, 'high tree files.csv')
 check_weight_and_merge(stacking_to_merge, 'stacking files.csv')
 
+
 # Merge submissions
 subs_to_merge = {
-    'high tree files.csv': .4,
-    'stacking files.csv': .35,
+    'high tree files.csv': .5,
+    'stacking files.csv': .30,
     '2500 files.csv': .15,
-    'old files.csv': .1
+    'old files.csv': .05
 }
 
 total_weight = 0
@@ -111,6 +114,6 @@ for key, val in subs_to_merge.iteritems():
 print "The total weight should be 1.0, it is: %s" % (total_weight)
 merge_subms(subs_to_merge, SUBM_PATH, 'blend z.csv', 'cost')
 
-subm_correl('blend y.csv',
-            'blend z.csv', 'id', 'cost')
+subm_correl('blend z.csv',
+            'blend y.csv', 'id', 'cost')
 

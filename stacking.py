@@ -1,6 +1,5 @@
 __author__ = 'p_cohen'
-from builtins import list, range, len, str, set, any
-from __builtin__ import int
+from __builtin__ import list, range, len, str, set, any, int, min
 
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
@@ -130,7 +129,7 @@ def gen_weights(df):
     grouped = df.groupby('tube_assembly_id')
     counts = grouped.one.sum().reset_index()
     counts = counts.rename(columns={'one': 'ob_weight'})
-    counts['ob_weight'] = 1/counts['ob_weight']
+    counts['ob_weight'] = counts['ob_weight']
     df = df.merge(counts, on='tube_assembly_id')
     df = df.drop('one', axis=1)
     return df
@@ -148,10 +147,11 @@ all_feats = all_data.columns.values
 avg_score = 0
 first_loop = 0
 num_loops = 6
-start_num = 12
+start_num = 18
 # Run bagged models
 for cv_fold in range(start_num, start_num+num_loops):
-    param = {'max_depth': 6, 'eta': .13, 'silent': 1, 'subsample': .7}
+    param = {'max_depth': 6, 'eta': .135, 'silent': 1, 'subsample': .7,
+             'colsample_bytree': .75}
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
     # recode target variable to log(x+1) in trn and val
@@ -171,42 +171,39 @@ for cv_fold in range(start_num, start_num+num_loops):
         for j in range(i+1, len(types)):
             for k in range(j+1, len(types)):
                 # Initialize the base features for first stage
-                stage1_feats = ['annual_usage', 'bracket_pricing',
-                                'min_order_quantity', 'quantity', 'quote_date',
-                                'supplier', 'tube_wall', 'tube_length',
-                                'tube_material_id', 'tube_diameter',
-                                'tube_num_bends', 'tube_bend_radius',
-                                'tube_end_a_1x', 'tube_end_a_2x',
-                                'tube_end_x_1x', 'tube_end_x_2x', 'tube_end_a',
-                                'tube_end_x', 'tube_num_boss',
-                                'tube_num_bracket', 'tube_other',
-                                'adjusted_unique_cnt',
-                                'year', 'month', 'dayofyear',
-                                'comp_weight_sum', 'first_year_appeared_cnt',
-                                'comp_tot_cnt', 'specs_cnt', 'adjusted_wt',
-                                'is_min_order_quantity', 'ext_as_pct',
-                                'len_x_dai', 'dia_over_len', 'wall_over_diam',
-                                'unq_cnt', 'thick_cnt', 'orient_cnt',
-                                'bend_per_length', 'radius_per_bend',
-                                'ann_use_ove_q', 'length_x_wall',
-                                'supplier_freq', 'dayofweek'
-                                ]
+                stg1_feats = ['annual_usage', 'bracket_pricing', 'tube_wall',
+                              'min_order_quantity', 'quote_date',
+                              'supplier', 'tube_length', 'adjusted_unique_cnt',
+                              'tube_material_id', 'tube_diameter',
+                              'tube_num_bends', 'tube_bend_radius',
+                              'tube_end_a_1x', 'tube_end_a_2x', 'quantity',
+                              'tube_end_x_1x', 'tube_end_x_2x', 'tube_end_a',
+                              'tube_end_x', 'tube_num_boss', 'supplier_freq',
+                              'tube_num_bracket', 'tube_other','dayofyear',
+                              'comp_weight_sum', 'first_year_appeared_cnt',
+                              'comp_tot_cnt', 'specs_cnt', 'adjusted_wt',
+                              'is_min_order_quantity', 'ext_as_pct',
+                              'len_x_dai', 'dia_over_len', 'wall_over_diam',
+                              'unq_cnt', 'thick_cnt', 'orient_cnt', 'month',
+                              'bend_per_length', 'radius_per_bend', 'year',
+                              'ann_use_ove_q', 'length_x_wall', 'dayofweek'
+                              ]
                 # Add all feats that match either component type
                 # Note: see data building for how shorten this if statement
                 for feat in all_feats:
                     if ((types[j] in feat) | (types[i] in feat) | (types[k] in feat)):
-                        stage1_feats.append(feat)
+                        stg1_feats.append(feat)
                 if first_loop == 0:
-                    print stage1_feats
+                    print stg1_feats
                     first_loop = 1
                 # Create xgboost data sets
-                xgb_feat_trn = xgb.DMatrix(np.array(feat_trn[stage1_feats]),
+                xgb_feat_trn = xgb.DMatrix(np.array(feat_trn[stg1_feats]),
                                       label=np.array(feat_trn.target),
                                       weight=np.array(feat_trn.ob_weight))
-                xgb_mod_trn = xgb.DMatrix(np.array(mod_trn[stage1_feats]),
+                xgb_mod_trn = xgb.DMatrix(np.array(mod_trn[stg1_feats]),
                                       label=np.array(mod_trn['target']))
-                xgb_val = xgb.DMatrix(np.array(val[stage1_feats]))
-                xgb_test = xgb.DMatrix(np.array(test[stage1_feats]))
+                xgb_val = xgb.DMatrix(np.array(val[stg1_feats]))
+                xgb_test = xgb.DMatrix(np.array(test[stg1_feats]))
                 # Fit xgboost
                 xboost = xgb.train(param.items(), xgb_feat_trn, 1000)
                 # Create scaled predictions
@@ -219,12 +216,12 @@ for cv_fold in range(start_num, start_num+num_loops):
                 score = rmsle(val['cost'], val['preds'+nm])
                 # Create ridge feats
                 model = Ridge(alpha=3)
-                model = model.fit(feat_trn[stage1_feats], feat_trn['target'])
+                model = model.fit(feat_trn[stg1_feats], feat_trn['target'])
                 # Predict and rescale predictions
                 nm = 'frststage_rdg' + types[i] + types[j] + types[k]
-                val = write_preds(val, model, nm, stage1_feats)
-                mod_trn = write_preds(mod_trn, model, nm, stage1_feats)
-                test = write_preds(test, model, nm, stage1_feats)
+                val = write_preds(val, model, nm, stg1_feats)
+                mod_trn = write_preds(mod_trn, model, nm, stg1_feats)
+                test = write_preds(test, model, nm, stg1_feats)
                 # Store prediction variable name
                 stage2_feats.append('preds'+nm)
                 score_rdg = rmsle(val['cost'], val['preds'+nm])
@@ -240,16 +237,16 @@ for cv_fold in range(start_num, start_num+num_loops):
     test = write_preds(test, model, cv_fold, stage2_feats)
     # Score loop
     score = rmsle(val['cost'], val['preds'+str(cv_fold)])
-    print "Score for fold %s is: %s" % (str(param['eta']), score)
+    print "Score for fold %s is: %s" % (cv_fold, score)
     avg_score += score/num_loops
 print avg_score
 
 
-test['cost'] = test[['preds12', 'preds13', 'preds14',
-                     'preds15', 'preds16', 'preds17']].mean(axis=1)
-test[['preds12', 'preds13', 'preds14', 'preds15', 'preds16', 'preds17']].corr()
+test['cost'] = test[['preds18', 'preds19', 'preds20',
+                     'preds21', 'preds22', 'preds23']].mean(axis=1)
+test[['preds18', 'preds19', 'preds20', 'preds21', 'preds22', 'preds23']].corr()
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'downweight stack.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'stack w col samp.csv', index=False)
 #'threeway vars with bill vars.csv'

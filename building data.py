@@ -354,12 +354,12 @@ def clean_merged_df(df):
     cols = list(df.columns.values)
     # Separate date variable (using old python, built in date functions are
     # out of date and I can't find old docs)
-    df['year'] = df.quote_date.apply(lambda x: x[0:4])
-    df['month'] = df.quote_date.apply(lambda x: x[5:7])
-    df['dayofyear'] = df.quote_date.apply(lambda x: x[8:10])
+    df['year'] = df.quote_date.apply(lambda x: x[0:4]).astype(int)
+    df['month'] = df.quote_date.apply(lambda x: x[5:7]).astype(int)
+    df['dayofyear'] = df.quote_date.apply(lambda x: x[8:10]).astype(int)
     df['dayofweek'] = df.quote_date.apply(
         lambda x: datetime.strptime(x, "%Y-%m-%d").weekday()
-    )
+    ).astype(int)
     # Create list of categorical and numeric vars
     col_types = df.dtypes.reset_index()
     num_col_rows = col_types[col_types[0] != 'object']

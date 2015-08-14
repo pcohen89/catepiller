@@ -5,8 +5,9 @@ __author__ = 'p_cohen'
 from __builtin__ import list, range, len, str, set, any, int
 
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 from sklearn.linear_model import Lasso
+from sklearn.tree import DecisionTreeRegressor
 import numpy as np
 import math
 import sys
@@ -35,8 +36,6 @@ def create_val_and_train(df, seed, ids, split_rt=.20):
         Output
         ----------------------------------------------------
         trn_for_mods (1-split_rate of df), trn_for_val (split_rate of data)
-
-
     """
     np.random.seed(seed)
     # Get vector of de-dupped values of ids
@@ -110,7 +109,7 @@ def write_preds(df, mod, name, features):
     """
     nm = 'preds'+str(name)
     df[nm] = mod.predict(df[features])
-    df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    df[nm] = np.power(df[nm], 16)
     return df
 
 def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
@@ -165,7 +164,7 @@ test = all_data[all_data.is_test != 0]
 
 # Create list of features
 feats = list(all_data.columns.values)
-non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost', 'first_year_appeared_cnt']
+non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
 for var in non_feats:
     feats.remove(var)
 
@@ -173,9 +172,10 @@ for var in non_feats:
 # Set parameters
 avg_score = 0
 num_loops = 6
-start_num = 12
+start_num = 18
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .0245, 'silent': 1, 'subsample': .5}
+param = {'max_depth': 8, 'eta': .025, 'silent': 1, 'subsample': .5,
+         'colsample_bytree': .75}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -200,25 +200,44 @@ avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'upweighted 6500 trees no compset.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'6500 with new folds and colsamp.csv', index=False)
 
 
 ############ Browse feature importances ################
 # Code for browsing feature importances
-for cv_fold in range(1, 2):
-    # Create trn val samples
-    trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-    # recode target variable to log(x+1)
-    trn['target'] = trn.cost.apply(lambda x: math.log(x+1))
-    val['target'] = val.cost.apply(lambda x: math.log(x+1))
-    # Gradient boosting
-    frst = RandomForestRegressor(n_estimators=200, n_jobs=8)
-    frst.fit(trn[feats], trn['target'])
-    outputs = pd.DataFrame({'feats': feats,
-                           'weight': frst.feature_importances_})
-    outputs = outputs.sort(columns='weight', ascending=False)
-    val = write_preds(val, frst, cv_fold, feats)
-    # Score loop
-    score = rmsle(val['cost'], val['preds'+str(cv_fold)])
-    print "Score for fold %s is: %s" % (cv_fold, score)
-    print outputs
+cv_fold = 12
+# Create trn val samples
+trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+# recode target variable to log(x+1)
+trn['target'] = np.power(trn['cost'], .0625)
+val['target'] = np.power(trn['cost'], .0625)
+# Gradient boosting
+frst = RandomForestRegressor(n_estimators=400, n_jobs=8)
+frst.fit(trn[feats], trn['target'])
+outputs = pd.DataFrame({'feats': feats,
+                       'weight': frst.feature_importances_})
+outputs = outputs.sort(columns='weight', ascending=False)
+val = write_preds(val, frst, cv_fold, feats)
+# Score loop
+score = rmsle(val['cost'], val['preds'+str(cv_fold)])
+print "Score for %s trees is: %s" % (12, score)
+print outputs
+
+
+# Code for browsing feature importances
+cv_fold = 12
+# Create trn val samples
+trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+# recode target variable to log(x+1)
+trn['target'] = np.power(trn['cost'], .0625)
+val['target'] = np.power(trn['cost'], .0625)
+# Gradient boosting
+frst = AdaBoostRegressor(base_estimator=DecisionTreeRegressor(max_depth=8),
+                         n_estimators=400, learning_rate=.08,
+                         loss='linear')
+frst.fit(trn[feats], trn['target'])
+val = write_preds(val, frst, cv_fold, feats)
+# Score loop
+score = rmsle(val['cost'], val['preds'+str(cv_fold)])
+print "Score for %s trees is: %s" % (12, score)
+
