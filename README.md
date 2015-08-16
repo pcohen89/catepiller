@@ -47,7 +47,7 @@ In this case, the data will have a feature for each component. The feature will 
 - 
 
 ## Modeling approaches
-- [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
+- [ ] Gradient deep trees (need to use more parameters available)
 - [x] Gradient with stumps (this seems to be dominated by meduim depth trees)
 - [x] Svm (small data means this might work okay)
 - [x] penalized regression
