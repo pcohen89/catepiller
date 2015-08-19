@@ -3,18 +3,16 @@ __author__ = 'p_cohen'
 ############## Import packages ########################
 # Workaround for pycharm bug
 from __builtin__ import list, range, len, str, set, any, int
-
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
-from sklearn.linear_model import Lasso
-from sklearn.tree import DecisionTreeRegressor
 import numpy as np
 import math
 import sys
 sys.path.append('/home/vagrant/xgboost/wrapper')
 import xgboost as xgb
 
-
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
+from sklearn.linear_model import Lasso
+from sklearn.tree import DecisionTreeRegressor
 ############### Define Globals ########################
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
 SUBM_PATH = '/home/vagrant/caterpillar-peter/Submissions/'
@@ -42,7 +40,7 @@ def create_val_and_train(df, seed, ids, split_rt=.20):
     id_dat = pd.DataFrame(df[ids].drop_duplicates())
     # Create random vector to split train val on
     vect_len = len(id_dat.ix[:, 0])
-    id_dat['rand_vals'] = (np.array(np.random.rand(vect_len,1)))
+    id_dat['rand_vals'] = (np.array(np.random.rand(vect_len, 1)))
     df = pd.merge(df, id_dat, on=ids)
     # split data into two dfs
     trn_for_mods = df[df.rand_vals > split_rt]
@@ -51,6 +49,7 @@ def create_val_and_train(df, seed, ids, split_rt=.20):
     trn_for_val = trn_for_val.drop('rand_vals', axis=1)
     trn_for_mods = trn_for_mods.drop('rand_vals', axis=1)
     return trn_for_mods, trn_for_val
+
 
 def rmsle(actual, predicted):
     """
@@ -74,22 +73,6 @@ def rmsle(actual, predicted):
     msle_val = np.mean(sle_val)
     return np.sqrt(msle_val)
 
-def lasso_var_select(df, feats):
-    """
-    Uses the lasso to select from a list of features
-    :param df: Dataframe to select features using (must have 'target')
-    :param feats: list of features from which to select
-    :return: Selected list of features
-
-    """
-    lass = Lasso(alpha = .0005)
-    lass.fit(df[feats], df['target'])
-    # Keep only lassoed vars (assigned non zero coefficient)
-    lassoed_vars = []
-    for i in range(0, len(lass.coef_)):
-        if lass.coef_[i] != 0:
-            lassoed_vars.append(feats[i])
-    return lassoed_vars
 
 def write_preds(df, mod, name, features):
     """
@@ -112,7 +95,8 @@ def write_preds(df, mod, name, features):
     df[nm] = np.power(df[nm], 16)
     return df
 
-def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
+
+def write_xgb_preds(df, xgb_data, mod, pred_nm, scale, is_test=0):
     """
     This writes predictions from an XGBOOST model into the data
 
@@ -123,6 +107,7 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
              with features used by mod)
     mod: XGB model used for predictions
     pred_nm: prediction naming convention
+    scale: (float) this is the power to raise predictions to pred^scale
 
     Output
     --------------
@@ -133,12 +118,13 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
     nm = 'preds'+str(pred_nm)
     # Predict and rescale (rescales to e^pred - 1)
     df[nm] = mod.predict(xgb_data)
-    #df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
-    df[nm] = np.power(df[nm], 16)
+    # df[nm] = df[nm].apply(lambda x: math.exp(x)-1)
+    df[nm] = np.power(df[nm], scale)
     # Create an average prediction across folds for actual submission
     if is_test == 1:
         df['cost'] += df[nm]/num_loops
     return df
+
 
 def gen_weights(df):
     """
@@ -161,49 +147,50 @@ def gen_weights(df):
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
 non_test = all_data[all_data.is_test == 0]
 test = all_data[all_data.is_test != 0]
-
 # Create list of features
 feats = list(all_data.columns.values)
 non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
 for var in non_feats:
     feats.remove(var)
 
-############ Run unrebalanced xgb ################
+# ########### Run unrebalanced xgb ################
 # Set parameters
 avg_score = 0
 num_loops = 6
 start_num = 18
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .025, 'silent': 1, 'subsample': .5,
-         'colsample_bytree': .75}
+param = {'max_depth': 8, 'eta': .01,  'silent': 1, 'subsample': .65,
+         'colsample_bytree': .75, 'gamma': .00095}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-    trn['target'] = np.power(trn['cost'], .0625)
+    power_up, power_down = 16, 1.0/16
+    if cv_fold % 2 == 0:
+        power_up, power_down = 18, 1.0/18
+    trn['target'] = np.power(trn['cost'], power_down)
     trn = gen_weights(trn)
     # Gradient boosting
-    xgb_trn = xgb.DMatrix(np.array(trn[feats]),
-                          label=np.array(trn['target']),
+    xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']),
                           weight=np.array(trn.ob_weight))
     xgb_val = xgb.DMatrix(np.array(val[feats]))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
     xboost = xgb.train(param.items(), xgb_trn, 6500)
     # Predict and rescale predictions
-    val = write_xgb_preds(val, xgb_val, xboost, str(cv_fold), is_test=0)
-    test = write_xgb_preds(test, xgb_test, xboost, str(cv_fold), is_test=1)
+    cv_str =  str(cv_fold)
+    val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
+    test = write_xgb_preds(test, xgb_test, xboost, cv_str, power_up, is_test=1)
     # Save score
-    score = rmsle(val['cost'], val['preds'+str(cv_fold)])
+    score = rmsle(val['cost'], val['preds'+cv_str])
     avg_score += score/num_loops
     print score
 avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'6500 with new folds and colsamp.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'4000 with new folds and colsamp.csv', index=False)
 
-
-############ Browse feature importances ################
+# ########### Browse feature importances ################
 # Code for browsing feature importances
 cv_fold = 12
 # Create trn val samples
@@ -215,29 +202,10 @@ val['target'] = np.power(trn['cost'], .0625)
 frst = RandomForestRegressor(n_estimators=400, n_jobs=8)
 frst.fit(trn[feats], trn['target'])
 outputs = pd.DataFrame({'feats': feats,
-                       'weight': frst.feature_importances_})
+                        'weight': frst.feature_importances_})
 outputs = outputs.sort(columns='weight', ascending=False)
 val = write_preds(val, frst, cv_fold, feats)
 # Score loop
 score = rmsle(val['cost'], val['preds'+str(cv_fold)])
 print "Score for %s trees is: %s" % (12, score)
 print outputs
-
-
-# Code for browsing feature importances
-cv_fold = 12
-# Create trn val samples
-trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-# recode target variable to log(x+1)
-trn['target'] = np.power(trn['cost'], .0625)
-val['target'] = np.power(trn['cost'], .0625)
-# Gradient boosting
-frst = AdaBoostRegressor(base_estimator=DecisionTreeRegressor(max_depth=8),
-                         n_estimators=400, learning_rate=.08,
-                         loss='linear')
-frst.fit(trn[feats], trn['target'])
-val = write_preds(val, frst, cv_fold, feats)
-# Score loop
-score = rmsle(val['cost'], val['preds'+str(cv_fold)])
-print "Score for %s trees is: %s" % (12, score)
-
