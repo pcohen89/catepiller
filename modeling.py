@@ -156,11 +156,13 @@ for var in non_feats:
 # ########### Run unrebalanced xgb ################
 # Set parameters
 avg_score = 0
-num_loops = 6
-start_num = 18
+num_loops = 15
+start_num = 42
+loop = 1
+current_sum = 0.0
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .01,  'silent': 1, 'subsample': .65,
-         'colsample_bytree': .75, 'gamma': .00095}
+param = {'max_depth': 8, 'eta': .022,  'silent': 1, 'subsample': .5,
+         'colsample_bytree': .75, 'gamma': .00025}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
@@ -177,18 +179,22 @@ for cv_fold in range(start_num, start_num+num_loops):
     xgb_test = xgb.DMatrix(np.array(test[feats]))
     xboost = xgb.train(param.items(), xgb_trn, 6500)
     # Predict and rescale predictions
-    cv_str =  str(cv_fold)
+    cv_str = str(cv_fold)
     val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
     test = write_xgb_preds(test, xgb_test, xboost, cv_str, power_up, is_test=1)
     # Save score
     score = rmsle(val['cost'], val['preds'+cv_str])
     avg_score += score/num_loops
-    print score
-avg_score
+    current_sum += score
+    print "Loop %s score is : %s" % (loop, score)
+    print "Current average score is %s" % (current_sum/loop)
+    loop += 1
+
+print avg_score
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'4000 with new folds and colsamp.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'6500 trees with 15 folds and minor gamma.csv', index=False)
 
 # ########### Browse feature importances ################
 # Code for browsing feature importances
