@@ -68,16 +68,19 @@ old_files_to_merge = {
 }
 
 files2500_to_merge = {
-    '2500 with new folds and colsamp.csv': .65,
-    '2500 trees power bill vars.csv': .05,
-    'weight 2500 trees.csv': .1,
-    '2500 with new folds.csv': .1,
-    'downweighted 2500 trees.csv': .10,
+    '2500 trees with 15 folds and minor gamma.csv': .6,
+    '2500 with new folds and colsamp.csv': .13,
+    '2500 trees power bill vars.csv': .03,
+    'weight 2500 trees.csv': .08,
+    '2500 with new folds.csv': .08,
+    'downweighted 2500 trees.csv': .08,
 
 }
 
 hightrees_to_merge = {
-    '6500 with new folds and colsamp.csv': .71,
+    '6500 trees with 15 folds and minor gamma.csv': .45,
+    '6500 with new folds and colsamp.csv': .11,
+    '4000 with new folds and colsamp.csv': .15,
     '4000 trees power bill vars 2nd set depth 8.csv': .05,
     'upweighted 4000 trees.csv': .02,
     'upweighted 6500 trees no compset.csv': .07,
@@ -89,9 +92,11 @@ hightrees_to_merge = {
 }
 
 stacking_to_merge = {
-  'upweight stack extra stage1 vars.csv': .4,
-  'threeway vars with bill vars.csv': .2,
-  'stack w new folds.csv': .4
+  'stack w col samp 15 folds.csv': .4,
+  'stack w col samp.csv': .2,
+  'upweight stack extra stage1 vars.csv': .15,
+  'threeway vars with bill vars.csv': .1,
+  'stack w new folds.csv': .15
 }
 
 check_weight_and_merge(old_files_to_merge, 'old files.csv')
@@ -102,18 +107,19 @@ check_weight_and_merge(stacking_to_merge, 'stacking files.csv')
 
 # Merge submissions
 subs_to_merge = {
-    'high tree files.csv': .5,
-    'stacking files.csv': .30,
+    'high tree files.csv': .45,
+    'stacking files.csv': .17,
     '2500 files.csv': .15,
-    'old files.csv': .05
+    'old files.csv': .03,
+    'seeds and nuts in a bag.csv': .2
 }
 
 total_weight = 0
 for key, val in subs_to_merge.iteritems():
     total_weight += val
 print "The total weight should be 1.0, it is: %s" % (total_weight)
-merge_subms(subs_to_merge, SUBM_PATH, 'blend z.csv', 'cost')
+merge_subms(subs_to_merge, SUBM_PATH, 'blend ad.csv', 'cost')
 
-subm_correl('blend z.csv',
-            'blend y.csv', 'id', 'cost')
+subm_correl('blend ad.csv',
+            'blend ac.csv', 'id', 'cost')
 

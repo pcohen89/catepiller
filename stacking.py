@@ -118,6 +118,7 @@ def write_xgb_preds(df, xgb_data, mod, pred_nm, is_test=0):
         df['cost'] += df[nm]/num_loops
     return df
 
+
 def gen_weights(df):
     """
     This creates weights based on the number of rows per tube assembly
@@ -146,8 +147,8 @@ types = ['boss', 'adaptor', 'elbow', 'float', 'hfl', 'nut', 'other', 'sleeve',
 all_feats = all_data.columns.values
 avg_score = 0
 first_loop = 0
-num_loops = 6
-start_num = 18
+num_loops = 15
+start_num = 42
 # Run bagged models
 for cv_fold in range(start_num, start_num+num_loops):
     param = {'max_depth': 6, 'eta': .135, 'silent': 1, 'subsample': .7,
@@ -191,45 +192,44 @@ for cv_fold in range(start_num, start_num+num_loops):
                 # Add all feats that match either component type
                 # Note: see data building for how shorten this if statement
                 for feat in all_feats:
-                    if ((types[j] in feat) | (types[i] in feat) | (types[k] in feat)):
+                    if ((types[j] in feat) | (types[i] in feat) |
+                            (types[k] in feat)):
                         stg1_feats.append(feat)
-                if first_loop == 0:
-                    print stg1_feats
-                    first_loop = 1
                 # Create xgboost data sets
                 xgb_feat_trn = xgb.DMatrix(np.array(feat_trn[stg1_feats]),
-                                      label=np.array(feat_trn.target),
-                                      weight=np.array(feat_trn.ob_weight))
+                                           label=np.array(feat_trn.target),
+                                           weight=np.array(feat_trn.ob_weight))
                 xgb_mod_trn = xgb.DMatrix(np.array(mod_trn[stg1_feats]),
-                                      label=np.array(mod_trn['target']))
+                                          label=np.array(mod_trn['target']))
                 xgb_val = xgb.DMatrix(np.array(val[stg1_feats]))
                 xgb_test = xgb.DMatrix(np.array(test[stg1_feats]))
                 # Fit xgboost
                 xboost = xgb.train(param.items(), xgb_feat_trn, 1000)
                 # Create scaled predictions
-                nm = 'frststage' + types[i] + types[j]  + types[k]
-                val = write_xgb_preds(val, xgb_val, xboost, nm)
-                mod_trn = write_xgb_preds(mod_trn, xgb_mod_trn, xboost, nm)
-                test = write_xgb_preds(test, xgb_test, xboost, nm)
+                nm1 = 'frststage' + types[i] + types[j] + types[k]
+                val = write_xgb_preds(val, xgb_val, xboost, nm1)
+                mod_trn = write_xgb_preds(mod_trn, xgb_mod_trn, xboost, nm1)
+                test = write_xgb_preds(test, xgb_test, xboost, nm1)
                 # Add prediction to stage 2 features
-                stage2_feats.append('preds'+nm)
-                score = rmsle(val['cost'], val['preds'+nm])
+                stage2_feats.append('preds'+nm1)
+                score = rmsle(val['cost'], val['preds'+nm1])
                 # Create ridge feats
                 model = Ridge(alpha=3)
                 model = model.fit(feat_trn[stg1_feats], feat_trn['target'])
                 # Predict and rescale predictions
-                nm = 'frststage_rdg' + types[i] + types[j] + types[k]
-                val = write_preds(val, model, nm, stg1_feats)
-                mod_trn = write_preds(mod_trn, model, nm, stg1_feats)
-                test = write_preds(test, model, nm, stg1_feats)
+                nm2 = 'frststage_rdg' + types[i] + types[j] + types[k]
+                val = write_preds(val, model, nm2, stg1_feats)
+                mod_trn = write_preds(mod_trn, model, nm2, stg1_feats)
+                test = write_preds(test, model, nm2, stg1_feats)
                 # Store prediction variable name
-                stage2_feats.append('preds'+nm)
-                score_rdg = rmsle(val['cost'], val['preds'+nm])
+                stage2_feats.append('preds'+nm2)
+                score_rdg = rmsle(val['cost'], val['preds'+nm2])
                 # Report score of loop
-                label1 = "For the %s - %s - %s fold, score"
+                label1 = "For the %s - %s - %s fold, score "
                 label2 = "is %s for boost and %s for forest"
-                label = label1 + " " + label2
-                print label % (types[i], types[j], types[k], score, score_rdg)
+                label = label1 + label2
+                print label % (types[i], types[j], types[k], score,
+                               score_rdg)
     # Fit second stage model
     model = RandomForestRegressor(n_estimators=2000, n_jobs=8)
     model.fit(mod_trn[stage2_feats], mod_trn.target.values)
@@ -242,11 +242,13 @@ for cv_fold in range(start_num, start_num+num_loops):
 print avg_score
 
 
-test['cost'] = test[['preds18', 'preds19', 'preds20',
-                     'preds21', 'preds22', 'preds23']].mean(axis=1)
-test[['preds18', 'preds19', 'preds20', 'preds21', 'preds22', 'preds23']].corr()
+test['cost'] = test[[u'preds42', u'preds43', u'preds44', u'preds45', u'preds46',
+                     u'preds47', u'preds48', u'preds49', u'preds50',
+                     u'preds51', u'preds52', u'preds53', u'preds54',
+                     u'preds55', u'preds56']].mean(axis=1)
+
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'stack w col samp.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'stack w col samp 15 folds.csv', index=False)
 #'threeway vars with bill vars.csv'

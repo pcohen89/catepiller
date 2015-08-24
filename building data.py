@@ -74,7 +74,6 @@ def clean_specs(path):
     should mean the same thing but because of an artifact of the storage
     they will be treated as totally unrelated.
 
-    :param specs: Specs.csv data set from caterpiller comp
     :param path: path to save new specs file to
     """
     # Read in csv
@@ -171,7 +170,6 @@ def gen_bill_vars(bill_path, comp_path):
 
     :param bill_path: path to bill of materials
     :param comp_path: path to component files
-    :param cln_path: path to output dataframe
     :return: dataframe with tube assembly ids and new variables
     """
     bill = pd.read_csv(bill_path)
@@ -393,6 +391,25 @@ def add_supp_var(df):
     df = df.merge(cnts_by_supplier, on='supplier')
     return df
 
+def create_material_amt_var(df):
+    """
+    This creates variables representing the amount and type of a material
+    that the tube uses
+
+    :param df: (dataframe)
+    :return: df with new vars
+    """
+    # Get common material ids
+    grpd = df.groupby('tube_material_id').tube_material_id
+    materials = grpd.count().reset_index()
+    # Keep materials that appear in over 200 tubes
+    materials = list(materials.ix[materials[0] > 200, 0])
+    for mat in materials:
+        name = 'mat' + str(mat) + '_amt'
+        df[name] = (df.tube_material_id == mat) * df.length_x_wall
+    return df
+
+
 def build_vars(df):
     """ This builds some miscellaneous variables that I
     manually determined could be useful for modeling """
@@ -406,6 +423,7 @@ def build_vars(df):
             if key in col:
                 val.append(col)
     # Create miscellaenous variables
+    # Create tube vars
     df['comp_weight_sum'] = df[summ_cols['weight_median']].sum(axis=1)
     df['apprx_density'] = df.comp_weight_sum/(df.tube_length + .01)
     df['adj_apprx_density'] = df.adjusted_wt/(df.tube_length + .01)
@@ -415,23 +433,26 @@ def build_vars(df):
     df['dia_over_len'] = df.tube_diameter/(df.tube_length + .01)
     df['wall_over_diam'] = df.tube_wall/(df.tube_diameter + .01)
     df['len_x_dai'] = df.tube_length * df.tube_diameter
-    df['ext_over_overall'] = (df.elbow_extension_length_max /
-                              df.elbow_overall_length_max + .01)
-    df['thick_ove_len'] = (df.elbow_thickness_max /
-                           df.elbow_overall_length_max + .01)
+    # Summarize varaibles with similar names
     df['comp_tot_cnt'] = df[summ_cols['materials_quantity']].sum(axis=1)
     df['specs_cnt'] = df[summ_cols['specs_']].sum(axis=1)
     df['plate_cnt'] = df[summ_cols['plating']].sum(axis=1)
     df['unq_cnt'] = df[summ_cols['unique']].sum(axis=1)
     df['thick_cnt'] = df[summ_cols['thick']].sum(axis=1)
     df['orient_cnt'] = df[summ_cols['orient']].sum(axis=1)
+    # Sum train vars
     df['ann_use_ove_min'] = df.annual_usage / (df.min_order_quantity + 1)
     df['ann_use_ove_q'] = df.annual_usage / (df.quantity + 1)
     df['is_min_order_quantity'] = df['min_order_quantity'] > 0
-    df['ext_as_pct'] = (df.elbow_extension_length_max/
+    df['ext_as_pct'] = (df.elbow_extension_length_max /
                         df.elbow_overall_length_max)
     df['data_bug1'] = ((df.min_order_quantity > 0) &
                        (df.bracket_pricing == 1))
+    df['ext_over_overall'] = (df.elbow_extension_length_max /
+                              df.elbow_overall_length_max + .01)
+    df['thick_ove_len'] = (df.elbow_thickness_max /
+                           df.elbow_overall_length_max + .01)
+    df = create_material_amt_var(df)
     df = df.fillna(-1)
     # Drop variables with no variation
     no_variation = ['sleeve_ori', 'sleeve_component_type',
@@ -465,9 +486,6 @@ def create_component_appearance_dt(tube_df):
         match_cond = (is_id_match & is_date_match)
         tube_df.ix[match_cond, 'first_year_appeared_cnt'] += 1
     return tube_df
-
-non_test = create_component_appearance_dt(all_data)
-
 
 ############### Define Globals ########################
 DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'

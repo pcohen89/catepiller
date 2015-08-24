@@ -11,7 +11,7 @@ sys.path.append('/home/vagrant/xgboost/wrapper')
 import xgboost as xgb
 
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
-from sklearn.linear_model import Lasso
+from sklearn.linear_model import Lasso, RidgeCV
 from sklearn.tree import DecisionTreeRegressor
 ############### Define Globals ########################
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
@@ -142,6 +142,69 @@ def gen_weights(df):
     df = df.drop('one', axis=1)
     return df
 
+def outcome_transfactor(int):
+    """
+    This creates slightly different functional forms for outcome
+
+    :param int: integer used to control functional form (think of it as a
+    random number
+    :return: transformation factor (power)
+    """
+    power_up, power_down = 16, 1.0/16
+    if int % 2 == 0:
+        power_up, power_down = 17, 1.0/17
+    if int % 3 == 0:
+        power_up, power_down = 15, 1.0/15
+    return power_up, power_down
+
+def create_firststage_preds(train, valid, testing):
+    """
+    This handles the first stage of a true stacking procedure using
+    random forests to create first stage predictions in the train, test,
+    and validation. Splits train into two sections, run random forest
+    on both and predicts from one half into other (and visa versa). Then
+    random forest is run on whole model and predicted into both validation
+    and test.
+    """
+    np.random.seed(42)
+    # Get vector of de-dupped values of ids
+    id_dat = pd.DataFrame(train['tube_assembly_id'].drop_duplicates())
+    # Create random vector to split train val on
+    vect_len = len(id_dat.ix[:, 0])
+    id_dat['rand_vals'] = (np.array(np.random.rand(vect_len, 1)))
+    df = pd.merge(train, id_dat, on='tube_assembly_id')
+    # Create model for both halves of df
+    frst1 = RandomForestRegressor(n_estimators=300, n_jobs=7)
+    is_first_half = df.rand_vals > .5
+    is_scnd_half = df.rand_vals < .5
+    frst1.fit(df.ix[is_first_half, feats], df.ix[is_first_half, 'target'])
+    frst2 = RandomForestRegressor(n_estimators=300, n_jobs=7)
+    frst2.fit(df.ix[is_scnd_half, feats], df.ix[is_scnd_half, 'target'])
+    # Predict frst1 onto forst2 data set and visa versa
+    train['forest'] = 0
+    train['forest'][is_scnd_half] = frst1.predict(df.ix[is_scnd_half, feats])
+    train['forest'][is_first_half] = frst2.predict(df.ix[is_first_half, feats])
+    # Create forest in full data for validation and test
+    frst = RandomForestRegressor(n_estimators=300, n_jobs=7)
+    frst.fit(df[feats], df.target)
+    valid['forest'] = frst.predict(valid[feats])
+    testing['forest'] = frst.predict(testing[feats])
+    # Create model for both halves of df
+    rdg1 = RidgeCV(alphas=[.5, .75, 1, 1.25])
+    rdg2 = RidgeCV(alphas=[.5, .75, 1, 1.25])
+    rdg1.fit(df.ix[is_first_half, feats], df.ix[is_first_half, 'target'])
+    rdg2.fit(df.ix[is_scnd_half, feats], df.ix[is_scnd_half, 'target'])
+    # Predict frst1 onto forst2 data set and visa versa
+    train['ridge'] = 0
+    train['ridge'][is_scnd_half] = rdg1.predict(df.ix[is_scnd_half, feats])
+    train['ridge'][is_first_half] = rdg2.predict(df.ix[is_first_half, feats])
+    # Create forest in full data for validation and test
+    rdg = RidgeCV(alphas=[.5, .75, 1, 1.25])
+    rdg.fit(df[feats], df.target)
+    valid['ridge'] = rdg.predict(valid[feats])
+    testing['ridge'] = rdg.predict(testing[feats])
+
+
 ############### Load data ######################
 # Load data
 all_data = pd.read_csv(CLN_PATH + "full_data.csv")
@@ -161,15 +224,13 @@ start_num = 42
 loop = 1
 current_sum = 0.0
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .022,  'silent': 1, 'subsample': .5,
+param = {'max_depth': 8, 'eta': .027,  'silent': 1, 'subsample': .75,
          'colsample_bytree': .75, 'gamma': .00025}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-    power_up, power_down = 16, 1.0/16
-    if cv_fold % 2 == 0:
-        power_up, power_down = 18, 1.0/18
+    power_up, power_down = outcome_transfactor(cv_fold)
     trn['target'] = np.power(trn['cost'], power_down)
     trn = gen_weights(trn)
     # Gradient boosting
@@ -177,7 +238,7 @@ for cv_fold in range(start_num, start_num+num_loops):
                           weight=np.array(trn.ob_weight))
     xgb_val = xgb.DMatrix(np.array(val[feats]))
     xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost = xgb.train(param.items(), xgb_trn, 6500)
+    xboost = xgb.train(param.items(), xgb_trn, 2500)
     # Predict and rescale predictions
     cv_str = str(cv_fold)
     val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
@@ -190,11 +251,61 @@ for cv_fold in range(start_num, start_num+num_loops):
     print "Current average score is %s" % (current_sum/loop)
     loop += 1
 
+############ TEST of a simple true stacking concept ######
+# Set parameters
+num_loops = 4
+start_num = 42
+loop = 1
+current_sum = 0.0
+test['cost'] = 0
+param = {'max_depth': 8, 'eta': .022,  'silent': 1, 'subsample': .65,
+         'colsample_bytree': .55, 'gamma': .00025}
+for eta in [.021, .022, .023, .024, .025, .0255]:
+    avg_score = 0
+    print "eta is %s" % eta
+    param['eta'] = eta
+    # Run models (looping through different train/val splits)
+    for cv_fold in range(start_num, start_num+num_loops):
+        # Create list of features
+        feats = list(all_data.columns.values)
+        non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
+        for var in non_feats:
+            feats.remove(var)
+        # Create trn val samples
+        trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+        # Create functional form of outcome
+        power_up, power_down = outcome_transfactor(cv_fold)
+        trn['target'] = np.power(trn['cost'], power_down)
+        trn = gen_weights(trn)
+        # Create first stage predictions
+        create_firststage_preds(trn, val, test)
+        feats.append('ridge')
+        feats.append('forest')
+        # Gradient boosting
+        xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']),
+                              weight=np.array(trn.ob_weight))
+        xgb_val = xgb.DMatrix(np.array(val[feats]))
+        xgb_test = xgb.DMatrix(np.array(test[feats]))
+        xboost = xgb.train(param.items(), xgb_trn, 2500)
+        # Predict and rescale predictions
+        cv_str = str(cv_fold)
+        val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
+        test = write_xgb_preds(test, xgb_test, xboost, cv_str, power_up, is_test=1)
+        # Save score
+        score = rmsle(val['cost'], val['preds'+cv_str])
+        avg_score += score/num_loops
+        current_sum += score
+        print "Loop %s score is : %s" % (loop, score)
+        print "Current average score is %s" % (current_sum/loop)
+        loop += 1
+
 print avg_score
+
+############################################################################
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'6500 trees with 15 folds and minor gamma.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees with 15 folds and minor gamma.csv', index=False)
 
 # ########### Browse feature importances ################
 # Code for browsing feature importances
@@ -205,7 +316,7 @@ trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
 trn['target'] = np.power(trn['cost'], .0625)
 val['target'] = np.power(trn['cost'], .0625)
 # Gradient boosting
-frst = RandomForestRegressor(n_estimators=400, n_jobs=8)
+frst = RandomForestRegressor(n_estimators=300, n_jobs=4)
 frst.fit(trn[feats], trn['target'])
 outputs = pd.DataFrame({'feats': feats,
                         'weight': frst.feature_importances_})
