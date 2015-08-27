@@ -44,10 +44,10 @@ In this case, the data will have a feature for each component. The feature will 
 - [ ] Identify if any tubes are exactly similar to any others (I have done this and it doesnt seem to help as much as expected, need to do further inquiry)
 - [ ] Interact year with other major variables
 - [x] 'other' seems to give good results, look into this component and manually extracting variables
-- 
+- [ ] Create a variable for each of the major material types, values are length_x_wall
 
 ## Modeling approaches
-- [x] Gradient deep trees (currently setting up a CV environment to tune one of these up)
+- [ ] Gradient deep trees (need to use more parameters available)
 - [x] Gradient with stumps (this seems to be dominated by meduim depth trees)
 - [x] Svm (small data means this might work okay)
 - [x] penalized regression
