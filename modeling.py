@@ -227,30 +227,33 @@ current_sum = 0.0
 test['cost'] = 0
 param = {'max_depth': 8, 'eta': .0268,  'silent': 1, 'subsample': .75,
          'colsample_bytree': .75, 'gamma': .00025}
-# Run models (looping through different train/val splits)
-for cv_fold in range(start_num, start_num+num_loops):
-    # Create trn val samples
-    trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-    power_up, power_down = outcome_transfactor(cv_fold)
-    trn['target'] = np.power(trn['cost'], power_down)
-    trn = gen_weights(trn)
-    # Gradient boosting
-    xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']),
-                          weight=np.array(trn.ob_weight))
-    xgb_val = xgb.DMatrix(np.array(val[feats]))
-    xgb_test = xgb.DMatrix(np.array(test[feats]))
-    xboost = xgb.train(param.items(), xgb_trn, 2500)
-    # Predict and rescale predictions
-    cv_str = str(cv_fold)
-    val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
-    test = write_xgb_preds(test, xgb_test, xboost, cv_str, power_up, is_test=1)
-    # Save score
-    score = rmsle(val['cost'], val['preds'+cv_str])
-    avg_score += score/num_loops
-    current_sum += score
-    print "Loop %s score is : %s" % (loop, score)
-    print "Current average score is %s" % (current_sum/loop)
-    loop += 1
+for eta in [.0258, .0262, .0264, .0266, .0268]:
+    print "eta is %s" % eta
+    param['eta'] = eta
+    # Run models (looping through different train/val splits)
+    for cv_fold in range(start_num, start_num+num_loops):
+        # Create trn val samples
+        trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+        power_up, power_down = outcome_transfactor(cv_fold)
+        trn['target'] = np.power(trn['cost'], power_down)
+        trn = gen_weights(trn)
+        # Gradient boosting
+        xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']),
+                              weight=np.array(trn.ob_weight))
+        xgb_val = xgb.DMatrix(np.array(val[feats]))
+        xgb_test = xgb.DMatrix(np.array(test[feats]))
+        xboost = xgb.train(param.items(), xgb_trn, 2500)
+        # Predict and rescale predictions
+        cv_str = str(cv_fold)
+        val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
+        test = write_xgb_preds(test, xgb_test, xboost, cv_str, power_up, is_test=1)
+        # Save score
+        score = rmsle(val['cost'], val['preds'+cv_str])
+        avg_score += score/num_loops
+        current_sum += score
+        print "Loop %s score is : %s" % (loop, score)
+        print "Current average score is %s" % (current_sum/loop)
+        loop += 1
 
 
 ############ TEST of a simple true stacking concept ######
