@@ -37,6 +37,7 @@ def clean_component_data(comp_dict):
         for i in range(0, len(feat_list)):
             # Cleaning steps for categorical or binary variables
             if ((feat_list[i]=='cat') | (feat_list[i]=='bin')):
+                df.ix[:, i] = df.ix[:, i].fillna('na')
                 lbl = preprocessing.LabelEncoder()
                 lbl.fit(list(df.ix[:, i]))
                 df.ix[:, i] = lbl.transform(df.ix[:, i])
@@ -115,6 +116,7 @@ def merge_noncomp(df, nm, lft_mrg, rt_mrg):
     :return: df
     """
     # Read in csv
+    print nm
     df_tomerge = pd.read_csv(DATA_PATH + nm +'.csv')
     # Rename columns to format tablename_column_name (if not merge variable)
     columns = df_tomerge.columns.values
@@ -124,6 +126,7 @@ def merge_noncomp(df, nm, lft_mrg, rt_mrg):
     # Merge
     df = pd.merge(df, df_tomerge, left_on=lft_mrg, right_on=rt_mrg, how='left')
     return df
+
 
 def aggregate_compslots(df, comp, comp_var_list):
     """
@@ -283,7 +286,7 @@ def create_freq_of_compset(df):
     # Create counts by component set
     grouped = df.groupby(comp_ids)
     counts = grouped.tube_assembly_id.count().reset_index()
-    counts = counts.rename(columns={0: 'compset_cnt'})
+    counts = counts.rename(columns={'tube_assembly_id': 'compset_cnt'})
     df = df.merge(counts, on=comp_ids)
     return df
 
@@ -387,9 +390,11 @@ def add_supp_var(df):
     """
     grpd = df.groupby('supplier')
     cnts_by_supplier = grpd['tube_assembly_id'].count().reset_index()
-    cnts_by_supplier = cnts_by_supplier.rename(columns={0: 'supplier_freq'})
+    cnts_by_supplier = cnts_by_supplier.rename(columns={'tube_assembly_id':
+                                                            'supplier_freq'})
     df = df.merge(cnts_by_supplier, on='supplier')
     return df
+
 
 def create_material_amt_var(df):
     """
@@ -400,10 +405,11 @@ def create_material_amt_var(df):
     :return: df with new vars
     """
     # Get common material ids
-    grpd = df.groupby('tube_material_id').tube_material_id
+    grpd = df.groupby('tube_material_id').tube_assembly_id
     materials = grpd.count().reset_index()
     # Keep materials that appear in over 200 tubes
-    materials = list(materials.ix[materials[0] > 200, 0])
+    common_materials = materials['tube_material_id'] > 200
+    materials = list(materials.ix[common_materials, 'tube_material_id'])
     for mat in materials:
         name = 'mat' + str(mat) + '_amt'
         df[name] = (df.tube_material_id == mat) * df.length_x_wall
@@ -433,6 +439,9 @@ def build_vars(df):
     df['dia_over_len'] = df.tube_diameter/(df.tube_length + .01)
     df['wall_over_diam'] = df.tube_wall/(df.tube_diameter + .01)
     df['len_x_dai'] = df.tube_length * df.tube_diameter
+    df['annulus_amt'] = (3.14*(df.tube_wall+df.tube_diameter/2)**2 -
+                         3.14*(df.tube_diameter/2)**2)
+    df['total_tube_mat'] = df.annulus_amt * df.tube_length
     # Summarize varaibles with similar names
     df['comp_tot_cnt'] = df[summ_cols['materials_quantity']].sum(axis=1)
     df['specs_cnt'] = df[summ_cols['specs_']].sum(axis=1)
@@ -488,8 +497,8 @@ def create_component_appearance_dt(tube_df):
     return tube_df
 
 ############### Define Globals ########################
-DATA_PATH = '/home/vagrant/caterpillar-peter/Original/'
-CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
+DATA_PATH = 'C:/Git_repos/catepiller/Original/'
+CLN_PATH = 'C:/Git_repos/catepiller/Clean/'
 
 # Data dictionary for cleaning comp tables
 COMP_DICT = {

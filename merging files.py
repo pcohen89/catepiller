@@ -4,7 +4,7 @@ __author__ = 'p_cohen'
 import pandas as pd
 
 ############### Define Globals ########################
-SUBM_PATH = '/home/vagrant/caterpillar-peter/Submissions/'
+SUBM_PATH = 'C:/Git_repos/catepiller/Submissions/'
 
 ############### Define Functions ########################
 def subm_correl(subm1, subm2, id, target):
@@ -107,19 +107,19 @@ check_weight_and_merge(stacking_to_merge, 'stacking files.csv')
 
 # Merge submissions
 subs_to_merge = {
-    'high tree files.csv': .45,
-    'stacking files.csv': .17,
+    'high tree files.csv': .42,
+    'stacking files.csv': .15,
     '2500 files.csv': .15,
     'old files.csv': .03,
-    'seeds and nuts in a bag.csv': .2
+    'power weirdness.csv': .25
 }
 
 total_weight = 0
 for key, val in subs_to_merge.iteritems():
     total_weight += val
 print "The total weight should be 1.0, it is: %s" % (total_weight)
-merge_subms(subs_to_merge, SUBM_PATH, 'blend ad.csv', 'cost')
+merge_subms(subs_to_merge, SUBM_PATH, 'blend af.csv', 'cost')
 
-subm_correl('blend ad.csv',
-            'blend ac.csv', 'id', 'cost')
+subm_correl('blend af.csv',
+            'blend ae.csv', 'id', 'cost')
 

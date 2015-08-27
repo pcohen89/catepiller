@@ -4,8 +4,8 @@ Neural networks, at least as currently implemented, do not seem to be an
 effective choice for this data set. I may come back to this if I run out of
 ideas.
 """
-from builtins import list, range, len, str, set, any
-from __builtin__ import int
+from __builtin__ import list, range, len, str, set, any, int
+
 
 import pandas as pd
 from keras.models import Sequential
@@ -14,6 +14,7 @@ from keras.optimizers import SGD
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import math
+import gc
 
 ############### Define Globals ########################
 CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'

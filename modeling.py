@@ -7,15 +7,16 @@ import pandas as pd
 import numpy as np
 import math
 import sys
-sys.path.append('/home/vagrant/xgboost/wrapper')
+sys.path.append('C:/Users/p_cohen/Desktop/xgboost try 2/')
+
 import xgboost as xgb
 
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor
 from sklearn.linear_model import Lasso, RidgeCV
 from sklearn.tree import DecisionTreeRegressor
 ############### Define Globals ########################
-CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
-SUBM_PATH = '/home/vagrant/caterpillar-peter/Submissions/'
+DATA_PATH = 'C:/Git_repos/catepiller/Original/'
+CLN_PATH = 'C:/Git_repos/catepiller/Clean/'
 
 ############### Define Functions ########################
 def create_val_and_train(df, seed, ids, split_rt=.20):
@@ -74,7 +75,7 @@ def rmsle(actual, predicted):
     return np.sqrt(msle_val)
 
 
-def write_preds(df, mod, name, features):
+def write_preds(df, mod, name, scale, features):
     """
     Writes predictions from a model into a dataframe, transforms them
     according to e^x - 1
@@ -92,7 +93,7 @@ def write_preds(df, mod, name, features):
     """
     nm = 'preds'+str(name)
     df[nm] = mod.predict(df[features])
-    df[nm] = np.power(df[nm], 16)
+    df[nm] = np.power(df[nm], scale)
     return df
 
 
@@ -219,12 +220,12 @@ for var in non_feats:
 # ########### Run unrebalanced xgb ################
 # Set parameters
 avg_score = 0
-num_loops = 15
+num_loops = 8
 start_num = 42
 loop = 1
 current_sum = 0.0
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .027,  'silent': 1, 'subsample': .75,
+param = {'max_depth': 8, 'eta': .0268,  'silent': 1, 'subsample': .75,
          'colsample_bytree': .75, 'gamma': .00025}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
@@ -251,53 +252,51 @@ for cv_fold in range(start_num, start_num+num_loops):
     print "Current average score is %s" % (current_sum/loop)
     loop += 1
 
+
 ############ TEST of a simple true stacking concept ######
 # Set parameters
-num_loops = 4
+num_loops = 8
 start_num = 42
+avg_score = 0
 loop = 1
 current_sum = 0.0
 test['cost'] = 0
-param = {'max_depth': 8, 'eta': .022,  'silent': 1, 'subsample': .65,
+param = {'max_depth': 8, 'eta': .0218,  'silent': 1, 'subsample': .65,
          'colsample_bytree': .55, 'gamma': .00025}
-for eta in [.021, .022, .023, .024, .025, .0255]:
-    avg_score = 0
-    print "eta is %s" % eta
-    param['eta'] = eta
-    # Run models (looping through different train/val splits)
-    for cv_fold in range(start_num, start_num+num_loops):
-        # Create list of features
-        feats = list(all_data.columns.values)
-        non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
-        for var in non_feats:
-            feats.remove(var)
-        # Create trn val samples
-        trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-        # Create functional form of outcome
-        power_up, power_down = outcome_transfactor(cv_fold)
-        trn['target'] = np.power(trn['cost'], power_down)
-        trn = gen_weights(trn)
-        # Create first stage predictions
-        create_firststage_preds(trn, val, test)
-        feats.append('ridge')
-        feats.append('forest')
-        # Gradient boosting
-        xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']),
-                              weight=np.array(trn.ob_weight))
-        xgb_val = xgb.DMatrix(np.array(val[feats]))
-        xgb_test = xgb.DMatrix(np.array(test[feats]))
-        xboost = xgb.train(param.items(), xgb_trn, 2500)
-        # Predict and rescale predictions
-        cv_str = str(cv_fold)
-        val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
-        test = write_xgb_preds(test, xgb_test, xboost, cv_str, power_up, is_test=1)
-        # Save score
-        score = rmsle(val['cost'], val['preds'+cv_str])
-        avg_score += score/num_loops
-        current_sum += score
-        print "Loop %s score is : %s" % (loop, score)
-        print "Current average score is %s" % (current_sum/loop)
-        loop += 1
+# Run models (looping through different train/val splits)
+for cv_fold in range(start_num, start_num+num_loops):
+    # Create list of features
+    feats = list(all_data.columns.values)
+    non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
+    for var in non_feats:
+        feats.remove(var)
+    # Create trn val samples
+    trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
+    # Create functional form of outcome
+    power_up, power_down = outcome_transfactor(cv_fold)
+    trn['target'] = np.power(trn['cost'], power_down)
+    trn = gen_weights(trn)
+    # Create first stage predictions
+    create_firststage_preds(trn, val, test)
+    feats.append('ridge')
+    feats.append('forest')
+    # Gradient boosting
+    xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']),
+                          weight=np.array(trn.ob_weight))
+    xgb_val = xgb.DMatrix(np.array(val[feats]))
+    xgb_test = xgb.DMatrix(np.array(test[feats]))
+    xboost = xgb.train(param.items(), xgb_trn, 2500)
+    # Predict and rescale predictions
+    cv_str = str(cv_fold)
+    val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
+    test = write_xgb_preds(test, xgb_test, xboost, cv_str, power_up, is_test=1)
+    # Save score
+    score = rmsle(val['cost'], val['preds'+cv_str])
+    avg_score += score/num_loops
+    current_sum += score
+    print "Loop %s score is : %s" % (loop, score)
+    print "Current average score is %s" % (current_sum/loop)
+    loop += 1
 
 print avg_score
 
@@ -321,7 +320,7 @@ frst.fit(trn[feats], trn['target'])
 outputs = pd.DataFrame({'feats': feats,
                         'weight': frst.feature_importances_})
 outputs = outputs.sort(columns='weight', ascending=False)
-val = write_preds(val, frst, cv_fold, feats)
+val = write_preds(val, frst, cv_fold, 16, feats)
 # Score loop
 score = rmsle(val['cost'], val['preds'+str(cv_fold)])
 print "Score for %s trees is: %s" % (12, score)
