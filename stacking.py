@@ -10,8 +10,9 @@ sys.path.append('/home/vagrant/xgboost/wrapper')
 import xgboost as xgb
 
 ############### Define Globals ########################
-CLN_PATH = '/home/vagrant/caterpillar-peter/Clean/'
-SUBM_PATH = '/home/vagrant/caterpillar-peter/Submissions/'
+DATA_PATH = 'C:/Git_repos/catepiller/Original/'
+CLN_PATH = 'C:/Git_repos/catepiller/Clean/'
+SUBM_PATH = 'C:/Git_repos/catepiller/Submissions/'
 ############### Define Functions ########################
 def create_val_and_train(df, seed, ids, split_rt = .20):
     """
@@ -242,13 +243,10 @@ for cv_fold in range(start_num, start_num+num_loops):
 print avg_score
 
 
-test['cost'] = test[[u'preds42', u'preds43', u'preds44', u'preds45', u'preds46',
-                     u'preds47', u'preds48', u'preds49', u'preds50',
-                     u'preds51', u'preds52', u'preds53', u'preds54',
-                     u'preds55', u'preds56']].mean(axis=1)
+test['cost'] = test[[u'preds42', u'preds43', u'preds44', u'preds45', u'preds46']].mean(axis=1)
 
 
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'stack w col samp 15 folds.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'stack w col samp 5 folds new var.csv', index=False)
 #'threeway vars with bill vars.csv'

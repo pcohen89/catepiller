@@ -92,8 +92,9 @@ hightrees_to_merge = {
 }
 
 stacking_to_merge = {
-  'stack w col samp 15 folds.csv': .4,
-  'stack w col samp.csv': .2,
+  'stack w col samp 15 folds.csv': .2,
+  'stack w col samp 5 folds new var.csv': .15,
+  'stack w col samp.csv': .05,
   'upweight stack extra stage1 vars.csv': .15,
   'threeway vars with bill vars.csv': .1,
   'stack w new folds.csv': .15
@@ -120,6 +121,11 @@ for key, val in subs_to_merge.iteritems():
 print "The total weight should be 1.0, it is: %s" % (total_weight)
 merge_subms(subs_to_merge, SUBM_PATH, 'blend af.csv', 'cost')
 
-subm_correl('blend af.csv',
-            'blend ae.csv', 'id', 'cost')
+
+thing = {'2500 trees with 15 folds and new vars part 2.csv': .5,
+         '2500 trees with 15 folds and new vars.csv': .5}
+check_weight_and_merge(thing, '2500 trees with 15 folds and new vars all folds.csv')
+
+subm_correl('stack w col samp 15 folds.csv',
+            'stack w col samp 5 folds new var.csv', 'id', 'cost')
 

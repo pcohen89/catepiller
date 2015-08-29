@@ -221,68 +221,19 @@ for var in non_feats:
 # Set parameters
 avg_score = 0
 num_loops = 8
-start_num = 42
+start_num = 50
+test['cost'] = 0
 loop = 1
 current_sum = 0.0
-test['cost'] = 0
-param = {'max_depth': 8, 'eta': .0268,  'silent': 1, 'subsample': .75,
+param = {'max_depth': 8, 'eta': .0264,  'silent': 1, 'subsample': .75,
          'colsample_bytree': .75, 'gamma': .00025}
-for eta in [.0258, .0262, .0264, .0266, .0268]:
-    print "eta is %s" % eta
-    param['eta'] = eta
-    # Run models (looping through different train/val splits)
-    for cv_fold in range(start_num, start_num+num_loops):
-        # Create trn val samples
-        trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-        power_up, power_down = outcome_transfactor(cv_fold)
-        trn['target'] = np.power(trn['cost'], power_down)
-        trn = gen_weights(trn)
-        # Gradient boosting
-        xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']),
-                              weight=np.array(trn.ob_weight))
-        xgb_val = xgb.DMatrix(np.array(val[feats]))
-        xgb_test = xgb.DMatrix(np.array(test[feats]))
-        xboost = xgb.train(param.items(), xgb_trn, 2500)
-        # Predict and rescale predictions
-        cv_str = str(cv_fold)
-        val = write_xgb_preds(val, xgb_val, xboost, cv_str, power_up, is_test=0)
-        test = write_xgb_preds(test, xgb_test, xboost, cv_str, power_up, is_test=1)
-        # Save score
-        score = rmsle(val['cost'], val['preds'+cv_str])
-        avg_score += score/num_loops
-        current_sum += score
-        print "Loop %s score is : %s" % (loop, score)
-        print "Current average score is %s" % (current_sum/loop)
-        loop += 1
-
-
-############ TEST of a simple true stacking concept ######
-# Set parameters
-num_loops = 8
-start_num = 42
-avg_score = 0
-loop = 1
-current_sum = 0.0
-test['cost'] = 0
-param = {'max_depth': 8, 'eta': .0218,  'silent': 1, 'subsample': .65,
-         'colsample_bytree': .55, 'gamma': .00025}
 # Run models (looping through different train/val splits)
 for cv_fold in range(start_num, start_num+num_loops):
-    # Create list of features
-    feats = list(all_data.columns.values)
-    non_feats = ['id', 'is_test', 'tube_assembly_id', 'cost']
-    for var in non_feats:
-        feats.remove(var)
     # Create trn val samples
     trn, val = create_val_and_train(non_test, cv_fold, 'tube_assembly_id', .2)
-    # Create functional form of outcome
     power_up, power_down = outcome_transfactor(cv_fold)
     trn['target'] = np.power(trn['cost'], power_down)
     trn = gen_weights(trn)
-    # Create first stage predictions
-    create_firststage_preds(trn, val, test)
-    feats.append('ridge')
-    feats.append('forest')
     # Gradient boosting
     xgb_trn = xgb.DMatrix(np.array(trn[feats]), label=np.array(trn['target']),
                           weight=np.array(trn.ob_weight))
@@ -301,13 +252,9 @@ for cv_fold in range(start_num, start_num+num_loops):
     print "Current average score is %s" % (current_sum/loop)
     loop += 1
 
-print avg_score
-
-############################################################################
-
 # Export test preds
 test['id'] = test['id'].apply(lambda x: int(x))
-test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees with 15 folds and minor gamma.csv', index=False)
+test[['id', 'cost']].to_csv(SUBM_PATH+'2500 trees with 15 folds and new vars part 2.csv', index=False)
 
 # ########### Browse feature importances ################
 # Code for browsing feature importances
