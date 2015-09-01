@@ -1,5 +1,7 @@
 # Caterpiller (spelled correctly, unlike the repo)
 
+Competition result: 32/1333
+
 ## Different ideas for how to handle the data
 
 ### 1. Build data by taking summary statistics if multiple components of the same type match one assembly
